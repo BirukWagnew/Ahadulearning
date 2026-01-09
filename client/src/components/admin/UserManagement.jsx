@@ -96,7 +96,8 @@ const UserManagement = ({ onViewUser }) => {
         const matchesStatus =
           filterStatus === "all" ||
           (filterStatus === "active" && userStatus === "active") ||
-          (filterStatus === "pending" && userStatus === "pending");
+          (filterStatus === "pending" && userStatus === "pending") ||
+          (filterStatus === "blocked" && userStatus === "blocked");
 
         return matchesSearch && matchesRole && matchesStatus;
       })
@@ -161,23 +162,23 @@ const UserManagement = ({ onViewUser }) => {
 
   const handleBlockUser = async (userId) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/users/block/${userId}`,
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_BASE_URL}/api/admin/block/${userId}`,
+        {},
         {
-          method: "PUT",
           headers: {
-            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      const result = await response.json();
-
-      if (response.ok) {
-        toast.success("User blocked successfully");
-      } else {
-        alert(result.message || "Failed to block user");
-      }
+      toast.success("User blocked successfully");
       setUsers(
         users.map((user) =>
           user._id === userId
@@ -186,22 +187,29 @@ const UserManagement = ({ onViewUser }) => {
         )
       );
     } catch (error) {
-      console.error("Error:", error);
-      alert("An error occurred while blocking the user");
+      console.error("Error blocking user:", error);
+      toast.error(`Failed to block user: ${error.response?.data?.message || error.message}`);
     }
   };
 
   const handleUnblockUser = async (userId) => {
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/users/unblock/${userId}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/admin/unblock/${userId}`,
+        {},
         {
-          method: "PUT",
           headers: {
-            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
         }
       );
+      
       toast.success(response.data.message);
       setUsers(
         users.map((user) =>
@@ -212,7 +220,7 @@ const UserManagement = ({ onViewUser }) => {
       );
     } catch (error) {
       console.error("Error unblocking user:", error);
-      alert("Error unblocking user");
+      toast.error(`Failed to unblock user: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -244,6 +252,13 @@ const UserManagement = ({ onViewUser }) => {
             className="whitespace-nowrap"
           >
             Pending
+          </Button>
+          <Button
+            variant={filterStatus === "blocked" ? "default" : "ghost"}
+            onClick={() => setFilterStatus("blocked")}
+            className="whitespace-nowrap"
+          >
+            Blocked
           </Button>
         </div>
 

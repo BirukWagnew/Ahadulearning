@@ -16,6 +16,8 @@ import { InstructorTab } from "../components/course details/InstructorTab";
 import { useAuth } from "../context/AuthContext";
 import RelatedCourses from "../components/course details/relatedCourses";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 export const CourseDetails = () => {
   const { user } = useAuth();
   const studentId = user?._id;
@@ -36,12 +38,7 @@ export const CourseDetails = () => {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/courses/${courseId}`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();

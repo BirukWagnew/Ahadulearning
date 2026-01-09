@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { UploadCloud } from "lucide-react";
 import axios from "axios";
+import { useEffect } from "react";
 
 const categories = [
   "Computer Science",
@@ -59,8 +60,17 @@ const courseFormSchema = z.object({
 });
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_UR || "http://localhost:5000/api",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api`,
   withCredentials: true,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 const CourseForm = ({ courseId, setCourseId, setActiveTab, setModules }) => {
@@ -77,12 +87,37 @@ const CourseForm = ({ courseId, setCourseId, setActiveTab, setModules }) => {
     },
   });
 
-  const onSubmit = async (values) => {
+  useEffect(() => {
+    const loadCourse = async () => {
+      try {
+        const res = await api.get(`/courses/${courseId}`);
+        const c = res.data;
+
+        form.reset({
+          title: c?.title || "",
+          description: c?.description || "",
+          level: c?.level || "",
+          category: c?.category || "",
+          price: c?.price != null ? String(c.price) : "",
+          requirements: c?.requirements || "",
+          thumbnail: null,
+        });
+
+        if (Array.isArray(c?.modules)) {
+          setModules(c.modules);
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Failed to load course");
+      }
+    };
+
     if (courseId) {
-      toast.info("Course already created. Proceeding to curriculum.");
-      setActiveTab("curriculum");
-      return;
+      loadCourse();
     }
+  }, [courseId]);
+
+  const onSubmit = async (values) => {
+    console.log("Submitting course form with values:", values);
     try {
       const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
@@ -93,18 +128,33 @@ const CourseForm = ({ courseId, setCourseId, setActiveTab, setModules }) => {
         }
       });
 
+      if (courseId) {
+        console.log("Updating existing course:", courseId);
+        await api.put(`/courses/${courseId}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        toast.success("Course updated successfully");
+        console.log("Setting active tab to curriculum");
+        setActiveTab("curriculum");
+        return;
+      }
+
+      console.log("Creating new course");
       const response = await api.post("/courses", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       const newCourseId = response.data._id;
+      console.log("New course created with ID:", newCourseId);
       setCourseId(newCourseId);
       setModules([]);
       form.reset();
       toast.success("Course created successfully");
+      console.log("Setting active tab to curriculum");
       setActiveTab("curriculum");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create course");
+      console.error("Error submitting course form:", error);
+      toast.error(error.response?.data?.message || (courseId ? "Failed to update course" : "Failed to create course"));
     }
   };
 
@@ -213,9 +263,7 @@ const CourseForm = ({ courseId, setCourseId, setActiveTab, setModules }) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Course Requirements</FormLabel>
-                  <
-
-FormControl>
+                  <FormControl>
                     <Textarea
                       placeholder="List the requirements or prerequisites for your course..."
                       className="min-h-32"
@@ -238,13 +286,21 @@ FormControl>
                   <FormControl>
                     <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-md">
                       <div className="space-y-1 text-center">
-                        <UploadCloud className="mx-auto h-12 w-12 text-slate-400" />
+                        {field.value ? (
+                          <img
+                            src={URL.createObjectURL(field.value)}
+                            alt="Thumbnail preview"
+                            className="mx-auto h-32 w-32 object-cover rounded-md"
+                          />
+                        ) : (
+                          <UploadCloud className="mx-auto h-12 w-12 text-slate-400" />
+                        )}
                         <div className="flex text-sm">
                           <label
                             htmlFor="thumbnail-upload"
                             className="relative cursor-pointer rounded-md font-medium text-fidel-600 hover:text-fidel-500 focus-within:outline-none"
                           >
-                            <span>Upload a file</span>
+                            <span>{field.value ? "Change file" : "Upload a file"}</span>
                             <input
                               id="thumbnail-upload"
                               name="thumbnail-upload"

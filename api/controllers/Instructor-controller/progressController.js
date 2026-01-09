@@ -1,9 +1,22 @@
  import Progress from '../../models/Progress.js';
 import Course from '../../models/Course.js';
 import mongoose from 'mongoose';
+import Enrollment from '../../models/Enrollment.js';
 
 export const updateProgress = async (req, res) => {
   const { studentId, courseId, lessonId } = req.body;
+
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+
+  if (req.user.role !== 'student') {
+    return res.status(403).json({ error: 'Only students can update progress' });
+  }
+
+  if (!studentId || String(studentId) !== String(req.user._id)) {
+    return res.status(403).json({ error: 'You can only update your own progress' });
+  }
 
   if (!lessonId) {
     return res.status(400).json({ error: 'Lesson ID is required' });
@@ -12,6 +25,11 @@ export const updateProgress = async (req, res) => {
   try {
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
     const courseObjectId = new mongoose.Types.ObjectId(courseId);
+
+    const enrollment = await Enrollment.findOne({ studentId: studentObjectId, courseId: courseObjectId });
+    if (!enrollment) {
+      return res.status(403).json({ error: 'You must be enrolled in this course to update progress' });
+    }
 
     const course = await Course.findById(courseObjectId).populate({
       path: 'modules',
@@ -31,20 +49,21 @@ export const updateProgress = async (req, res) => {
       return res.status(400).json({ error: 'No lessons found in this course' });
     }
 
+    const normalizedLessonId = String(lessonId);
     let progress = await Progress.findOne({ studentId: studentObjectId, courseId: courseObjectId });
 
     if (!progress) {
       progress = await Progress.create({
         studentId: studentObjectId,
         courseId: courseObjectId,
-        completedLessons: [lessonId],
+        completedLessons: [normalizedLessonId],
         totalLessons,
         progressPercentage: parseFloat(((1 / totalLessons) * 100).toFixed(2)),
       });
     } else {
-      const alreadyCompleted = progress.completedLessons.includes(lessonId);
+      const alreadyCompleted = progress.completedLessons.includes(normalizedLessonId);
       if (!alreadyCompleted) {
-        progress.completedLessons.push(lessonId);
+        progress.completedLessons.push(normalizedLessonId);
         progress.progressPercentage = parseFloat(((progress.completedLessons.length / totalLessons) * 100).toFixed(2));
         await progress.save();
       }
@@ -62,20 +81,18 @@ export const updateProgress = async (req, res) => {
 export const getCompletedLessons = async (req, res) => {
   const { studentId, courseId } = req.params; // assuming studentId and courseId are passed as params
 
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+
+  if (req.user.role !== 'admin' && String(req.user._id) !== String(studentId)) {
+    return res.status(403).json({ error: 'You can only view your own progress' });
+  }
+
   try {
     console.log('getCompletedLessons called with:', { studentId, courseId });
     console.log('Database connection state:', mongoose.connection.readyState);
-    
-    // TEMPORARY: Return mock data for testing
-    if (studentId === '695d6910467839b6b67bc238' && courseId === '695ff77d5609a435c562eff4') {
-      console.log('Returning mock data for testing...');
-      return res.json({ 
-        completedLessons: ['lesson1', 'lesson2', 'lesson3', 'lesson4'],
-        totalLessons: 12,
-        progressPercentage: 33
-      });
-    }
-    
+
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
     const courseObjectId = new mongoose.Types.ObjectId(courseId);
     
@@ -115,6 +132,14 @@ export const getCompletedLessons = async (req, res) => {
 export const getProgressData = async (req, res) => {
   const { studentId, courseId } = req.params;
 
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+
+  if (req.user.role !== 'admin' && String(req.user._id) !== String(studentId)) {
+    return res.status(403).json({ error: 'You can only view your own progress' });
+  }
+
   try {
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
     const courseObjectId = new mongoose.Types.ObjectId(courseId);
@@ -131,7 +156,8 @@ export const getProgressData = async (req, res) => {
     res.json({
       completedLessons: progress.completedLessons,
       totalLessons: progress.totalLessons,
-      progressPercentage: progress.progressPercentage
+      progressPercentage: progress.progressPercentage,
+      lastAccessed: progress.lastAccessed || progress.updatedAt
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

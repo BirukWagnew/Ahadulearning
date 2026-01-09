@@ -32,6 +32,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
 import VerifyPayment from "./../src/components/Payment/VerifyPayment";
 import GetCertified from "./components/course details/GetCertified";
+import LearnLesson from "./pages/LearnLesson";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -211,6 +212,17 @@ const App = () => {
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/payment/failed" element={<PaymentFailed />} />
         <Route path="/verify-payment/:tx_ref" element={<VerifyPayment />} />
+
+        <Route
+          path="/learn/:courseId/lesson/:lessonId"
+          element={
+            <ProtectedRoute requiredRole="student">
+              <MainLayout>
+                <LearnLesson />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protected routes without layout */}
         <Route 

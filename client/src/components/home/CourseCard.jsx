@@ -20,6 +20,7 @@ const CourseCard = ({
   featured = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
   // Calculate total lessons and duration
   const totalLessons = modules.reduce(
@@ -45,7 +46,14 @@ const CourseCard = ({
   };
 
   const instructorName = instructor?.name || "Unknown Instructor";
-  const imageUrl = thumbnail?.url;
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const rawImageUrl = typeof thumbnail === "string" ? thumbnail : thumbnail?.url;
+  const imageUrl = rawImageUrl
+    ? rawImageUrl.startsWith("http")
+      ? rawImageUrl
+      : `${API_BASE_URL}${rawImageUrl}`
+    : "";
+
   const categoryName = category.split('-').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1)
   ).join(' ');
@@ -79,13 +87,16 @@ const CourseCard = ({
                 "absolute inset-0 bg-slate-200 dark:bg-slate-800 transition-transform duration-500",
                 isHovered ? "scale-105" : "scale-100"
               )}
-              style={imageUrl ? { 
-                backgroundImage: `url(${imageUrl})`, 
-                backgroundSize: 'cover', 
-                backgroundPosition: 'center' 
-              } : {}}
             >
-              {!imageUrl && (
+              {imageUrl && !thumbnailFailed ? (
+                <img
+                  src={imageUrl}
+                  alt={title}
+                  className="h-full w-full object-cover"
+                  onError={() => setThumbnailFailed(true)}
+                  loading="lazy"
+                />
+              ) : (
                 <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600">
                   <BookOpen size={48} />
                 </div>

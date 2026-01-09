@@ -63,8 +63,13 @@ ahadulearning/
 ### 1. Clone the repository
 
 ```bash
+<<<<<<< HEAD
 git clone https://github.com/BirukWagnew/ahadulearning.git
 cd ahadulearning
+=======
+git clone https://github.com/BirukWagnew/Ahadulearning
+cd Ahadulearning
+>>>>>>> 34e4e7d (Fix quiz functionality and image display)
 ```
 
 ### 2. Install dependencies

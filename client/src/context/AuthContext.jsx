@@ -11,18 +11,28 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  const refreshUser = async () => {
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/me`,
+        {},
+        { withCredentials: true }
+      );
+      setUser(res.data);
+      localStorage.setItem("user", JSON.stringify(res.data));
+      return res.data;
+    } catch (_err) {
+      setUser(null);
+      localStorage.removeItem("user");
+      return null;
+    }
+  };
+
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const res = await axios.post(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/me`,
-          {},
-          { withCredentials: true }
-        );
-        setUser(res.data);
-      } catch (err) {
-        setUser(null);
+        await refreshUser();
       } finally {
         setLoading(false);
       }
@@ -116,6 +126,7 @@ export const AuthProvider = ({ children }) => {
         error,
         login,
         logout,
+        refreshUser,
         isAuthenticated: !!user,
         getDashboardPath,
       }}

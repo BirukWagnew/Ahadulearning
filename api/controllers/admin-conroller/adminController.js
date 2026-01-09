@@ -1,6 +1,10 @@
 import User from '../../models/User.js';
 import mongoose from 'mongoose';
 import { sendEmail } from '../../Email Service/emailService.js'; 
+import Course from '../../models/Course.js';
+import { deleteFromCloudinary } from '../../services/cloudStorage.js';
+import Payment from '../../models/Payment.js';
+import Withdrawal from '../../models/Withdrawal.js';
 
 export const approveInstructor = async (req, res) => {
     const { userId } = req.params;
@@ -42,7 +46,44 @@ export const approveInstructor = async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
 };
- 
+
+export const getAllCoursesAdmin = async (req, res) => {
+  try {
+    const courses = await Course.find({})
+      .populate('instructor', 'name email')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ courses });
+  } catch (error) {
+    console.error('Error fetching courses (admin):', error);
+    return res.status(500).json({ message: 'Server error while fetching courses' });
+  }
+};
+
+export const deleteCourseAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+
+    const course = await Course.findById(id);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    if (course.thumbnail?.publicId) {
+      await deleteFromCloudinary(course.thumbnail.publicId);
+    }
+
+    await course.deleteOne();
+    return res.status(200).json({ message: 'Course deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting course (admin):', error);
+    return res.status(500).json({ message: 'Server error while deleting course' });
+  }
+};
 
 // Reject and delete instructor
 export const rejectInstructor = async (req, res) => {
@@ -65,15 +106,15 @@ export const rejectInstructor = async (req, res) => {
     await User.findByIdAndDelete(id);
 
     const subject = 'Your Account Approval Has Been Rejected';
-    const text = `Dear ${user.name},\n\nYour account approval has been rejected by the admin. You will not be able to access the platform as an instructor. If you have any questions, please contact support.`;
+    const text = `Dear ${instructor.name},\n\nYour account approval has been rejected by the admin. You will not be able to access the platform as an instructor. If you have any questions, please contact support.`;
     const htmlContent = `
       <h1>Account Approval Rejected</h1>
-      <p>Dear ${user.name},</p>
+      <p>Dear ${instructor.name},</p>
       <p>Your account approval has been rejected by the admin. You will not be able to access the platform as an instructor.</p>
       <p>If you have any questions, please contact support.</p>
     `;
     
-    await sendEmail(user.email, subject, text, htmlContent);
+    await sendEmail(instructor.email, subject, text, htmlContent);
     
     return res.status(200).json({ message: 'Instructor rejected and deleted successfully' });
 
@@ -300,7 +341,7 @@ export const deleteUser = async (req, res) => {
       return res.status(400).json({ message: 'Cannot delete your own admin account' });
     }
 
-    // Delete the user
+    // Delete user
     await User.findByIdAndDelete(id);
     
     return res.status(200).json({ 
@@ -308,13 +349,201 @@ export const deleteUser = async (req, res) => {
       deletedUser: {
         id: user._id,
         name: user.name,
-        email: user.email,
-        role: user.role
       }
     });
-
   } catch (error) {
-    console.error('Error deleting user:', error);
-    return res.status(500).json({ message: 'Server error while deleting user' });
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all payment transactions for admin
+export const getPaymentTransactions = async (req, res) => {
+  try {
+    const payments = await Payment.find()
+      .populate('studentId', 'name email')
+      .populate('courseId', 'title')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      payments,
+      count: payments.length
+    });
+  } catch (error) {
+    console.error("Error fetching payment transactions:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get all withdrawal requests for admin
+export const getWithdrawalRequests = async (req, res) => {
+  try {
+    const withdrawals = await Withdrawal.find()
+      .populate('user', 'name email bankDetails')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      withdrawals,
+      count: withdrawals.length
+    });
+  } catch (error) {
+    console.error("Error fetching withdrawal requests:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Approve withdrawal request
+export const approveWithdrawal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const withdrawal = await Withdrawal.findById(id).populate('user');
+    
+    if (!withdrawal) {
+      return res.status(404).json({ message: 'Withdrawal request not found' });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ message: 'Withdrawal request is not pending' });
+    }
+
+    // Update withdrawal status
+    withdrawal.status = 'success';
+    await withdrawal.save();
+
+    // Send email notification
+    const subject = 'Withdrawal Request Approved';
+    const text = `Dear ${withdrawal.user.name},\n\nYour withdrawal request of $${withdrawal.amount.toFixed(2)} has been approved. The funds will be transferred to your bank account within 2-3 business days.`;
+    const htmlContent = `
+      <h1>Withdrawal Approved</h1>
+      <p>Dear ${withdrawal.user.name},</p>
+      <p>Your withdrawal request of $${withdrawal.amount.toFixed(2)} has been approved.</p>
+      <p>The funds will be transferred to your bank account within 2-3 business days.</p>
+    `;
+
+    await sendEmail(withdrawal.user.email, subject, text, htmlContent);
+
+    res.status(200).json({
+      success: true,
+      message: 'Withdrawal request approved successfully',
+      withdrawal
+    });
+  } catch (error) {
+    console.error("Error approving withdrawal:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Reject withdrawal request
+export const rejectWithdrawal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    const withdrawal = await Withdrawal.findById(id).populate('user');
+    
+    if (!withdrawal) {
+      return res.status(404).json({ message: 'Withdrawal request not found' });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ message: 'Withdrawal request is not pending' });
+    }
+
+    // Update withdrawal status
+    withdrawal.status = 'failed';
+    withdrawal.responseMessage = reason || 'Withdrawal request rejected by admin';
+    await withdrawal.save();
+
+    // Send email notification
+    const subject = 'Withdrawal Request Rejected';
+    const text = `Dear ${withdrawal.user.name},\n\nYour withdrawal request of $${withdrawal.amount.toFixed(2)} has been rejected.\n\nReason: ${reason || 'No reason provided'}`;
+    const htmlContent = `
+      <h1>Withdrawal Rejected</h1>
+      <p>Dear ${withdrawal.user.name},</p>
+      <p>Your withdrawal request of $${withdrawal.amount.toFixed(2)} has been rejected.</p>
+      <p><strong>Reason:</strong> ${reason || 'No reason provided'}</p>
+    `;
+
+    await sendEmail(withdrawal.user.email, subject, text, htmlContent);
+
+    res.status(200).json({
+      success: true,
+      message: 'Withdrawal request rejected successfully',
+      withdrawal
+    });
+  } catch (error) {
+    console.error("Error rejecting withdrawal:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Generate payment report
+export const generatePaymentReport = async (req, res) => {
+  try {
+    const { startDate, endDate, format } = req.query;
+    
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.createdAt = { $gte: new Date(startDate) };
+    if (endDate) dateFilter.createdAt = { ...dateFilter.createdAt, $lte: new Date(endDate) };
+    
+    const payments = await Payment.find(dateFilter)
+      .populate('studentId', 'name email')
+      .populate('courseId', 'title')
+      .sort({ createdAt: -1 });
+
+    const withdrawals = await Withdrawal.find(dateFilter)
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 });
+
+    // Calculate statistics
+    const totalRevenue = payments
+      .filter(p => p.status === 'success')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const pendingWithdrawals = withdrawals
+      .filter(w => w.status === 'pending')
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    const completedWithdrawals = withdrawals
+      .filter(w => w.status === 'success')
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    const reportData = {
+      summary: {
+        totalPayments: payments.length,
+        totalRevenue,
+        pendingWithdrawals,
+        completedWithdrawals,
+        totalWithdrawals: pendingWithdrawals + completedWithdrawals
+      },
+      payments,
+      withdrawals
+    };
+
+    // Send different response based on format
+    if (format === 'csv') {
+      // Generate CSV (simplified for now)
+      const csvData = [
+        'Type,ID,Date,User,Amount,Status',
+        ...payments.map(p => `Payment,${p._id},${p.createdAt},${p.studentId?.name || 'N/A'},${p.amount},${p.status}`),
+        ...withdrawals.map(w => `Withdrawal,${w._id},${w.createdAt},${w.user?.name || 'N/A'},${w.amount},${w.status}`)
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=payment-report.csv');
+      res.send(csvData);
+    } else {
+      res.status(200).json({
+        success: true,
+        data: reportData
+      });
+    }
+  } catch (error) {
+    console.error("Error generating payment report:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

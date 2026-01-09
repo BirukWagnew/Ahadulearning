@@ -56,6 +56,16 @@ const MultipleChoiceQuiz = ({ initialQuestions = [], onChange, lessonId }) => {
         ]
   );
 
+  // Validation helper
+  const isQuestionValid = (question) => {
+    if (!question.question || question.question.trim() === '') return false;
+    const validOptions = question.options.filter(opt => opt.text && opt.text.trim() !== '');
+    if (validOptions.length < 2) return false;
+    const hasCorrectAnswer = question.options.some(opt => opt.isCorrect);
+    if (!hasCorrectAnswer) return false;
+    return true;
+  };
+
   const addQuestion = () => {
     const newQuestions = [
       ...questions,
@@ -93,46 +103,65 @@ const MultipleChoiceQuiz = ({ initialQuestions = [], onChange, lessonId }) => {
 
   return (
     <div className="space-y-6">
-      {questions.map((q, qIndex) => (
-        <div key={qIndex} className="border p-4 rounded-md">
-          <Label>Question {qIndex + 1}</Label>
-          <Input
-            value={q.question}
-            onChange={(e) => updateQuestion(qIndex, "question", e.target.value)}
-            placeholder="Enter question"
-            className="mt-2"
-          />
-          <div className="mt-4 space-y-2">
-            {q.options.map((opt, optIndex) => (
-              <div key={optIndex} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={opt.isCorrect}
-                  onChange={(e) =>
-                    updateOption(qIndex, optIndex, "isCorrect", e.target.checked)
-                  }
-                />
-                <Input
-                  value={opt.text}
-                  onChange={(e) =>
-                    updateOption(qIndex, optIndex, "text", e.target.value)
-                  }
-                  placeholder={`Option ${optIndex + 1}`}
-                />
+      {questions.map((q, qIndex) => {
+        const isValid = isQuestionValid(q);
+        return (
+          <div key={qIndex} className={`border p-4 rounded-md ${!isValid ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+            <div className="flex justify-between items-center mb-2">
+              <Label>Question {qIndex + 1}</Label>
+              {!isValid && (
+                <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
+                  Incomplete
+                </span>
+              )}
+            </div>
+            <Input
+              value={q.question}
+              onChange={(e) => updateQuestion(qIndex, "question", e.target.value)}
+              placeholder="Enter question"
+              className="mt-2"
+            />
+            <div className="mt-4 space-y-2">
+              {q.options.map((opt, optIndex) => (
+                <div key={optIndex} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={opt.isCorrect}
+                    onChange={(e) =>
+                      updateOption(qIndex, optIndex, "isCorrect", e.target.checked)
+                    }
+                  />
+                  <Input
+                    value={opt.text}
+                    onChange={(e) =>
+                      updateOption(qIndex, optIndex, "text", e.target.value)
+                    }
+                    placeholder={`Option ${optIndex + 1}`}
+                    className={!opt.text ? 'border-red-300' : ''}
+                  />
+                </div>
+              ))}
+            </div>
+            <select
+              value={q.type}
+              onChange={(e) => updateQuestion(qIndex, "type", e.target.value)}
+              className="mt-2 border rounded-md p-1"
+            >
+              <option value="single">Single Choice</option>
+              <option value="multiple">Multiple Choice</option>
+            </select>
+            {!isValid && (
+              <div className="mt-2 text-xs text-red-600">
+                Please ensure: question has text, at least 2 options with text, and one correct answer
               </div>
-            ))}
+            )}
           </div>
-          <select
-            value={q.type}
-            onChange={(e) => updateQuestion(qIndex, "type", e.target.value)}
-            className="mt-2 border rounded-md p-1"
-          >
-            <option value="single">Single Choice</option>
-            <option value="multiple">Multiple Choice</option>
-          </select>
-        </div>
-      ))}
+        );
+      })}
       <Button onClick={addQuestion}>Add Question</Button>
+      <div className="text-xs text-gray-500 mt-2">
+        Tips: Each question needs text, at least 2 options with text, and one correct answer marked.
+      </div>
     </div>
   );
 };

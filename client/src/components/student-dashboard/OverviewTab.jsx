@@ -18,10 +18,26 @@ export const OverviewTab = () => {
 
       setIsLoading(true);
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/enrollments/${user._id}/courses`);
-        setCourses(response.data);
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/enrollments/${user._id}/courses`, {
+          withCredentials: true
+        });
+        
+        console.log("Enrolled courses response:", response.data);
+        
+        // Handle different response formats
+        if (Array.isArray(response.data)) {
+          setCourses(response.data);
+        } else if (response.data?.courses && Array.isArray(response.data.courses)) {
+          setCourses(response.data.courses);
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          setCourses(response.data.data);
+        } else {
+          console.error("Unexpected response format:", response.data);
+          setCourses([]);
+        }
       } catch (error) {
         console.error("Failed to fetch enrolled courses:", error);
+        setCourses([]);
       } finally {
         setIsLoading(false);
       }
@@ -42,15 +58,29 @@ export const OverviewTab = () => {
         await Promise.all(
           courses.map(async (course) => {
             try {
-              const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/progress/${user._id}/${course._id}`);
+              const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/progress/${user._id}/${course._id}`, {
+                withCredentials: true
+              });
               updatedProgressMap[course._id] = res.data;
             } catch (err) {
               console.error(`Progress fetch failed for course ${course._id}:`, err);
-              updatedProgressMap[course._id] = {
-                progressPercentage: 0,
-                completedLessons: [],
-                error: err instanceof Error ? err.message : "Failed to fetch progress",
-              };
+              // If no progress exists yet, create a default progress entry
+              if (err.response?.status === 404) {
+                updatedProgressMap[course._id] = {
+                  progressPercentage: 0,
+                  completedLessons: [],
+                  totalLessons: 0,
+                  lastAccessed: null,
+                };
+              } else {
+                updatedProgressMap[course._id] = {
+                  progressPercentage: 0,
+                  completedLessons: [],
+                  totalLessons: 0,
+                  lastAccessed: null,
+                  error: err instanceof Error ? err.message : "Failed to fetch progress",
+                };
+              }
             }
           })
         );
@@ -205,6 +235,69 @@ export const OverviewTab = () => {
               </motion.div>
             ))}
           </div>
+        )}
+      </section>
+
+      {/* Not Started Courses */}
+      <section>
+        <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-white">
+          Not Started
+        </h3>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-32">
+            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+          </div>
+        ) : (
+          (() => {
+            const notStartedCourses = courses.filter(
+              (c) => {
+                const progress = progressMap[c._id];
+                return progress && progress.progressPercentage === 0 && !progress.error;
+              }
+            );
+            
+            return notStartedCourses.length === 0 ? (
+              <div className="glass-card p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No courses waiting to be started.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {notStartedCourses.map((course, i) => (
+                  <motion.div
+                    key={course._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: i * 0.1 }}
+                    className="glass-card p-4 hover:shadow-md transition-shadow duration-200"
+                  >
+                    <div className="flex items-start">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-slate-900 dark:text-white">
+                          {course.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Enrolled on{" "}
+                          {new Date(course.createdAt || Date.now()).toLocaleDateString()}
+                        </p>
+                        <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gray-300 dark:bg-gray-600"
+                            style={{ width: "0%" }}
+                          ></div>
+                        </div>
+                        <div className="mt-2 flex justify-between text-xs">
+                          <span className="text-muted-foreground">0% complete</span>
+                          <span className="font-medium text-fidel-500">Start Course</span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            );
+          })()
         )}
       </section>
 

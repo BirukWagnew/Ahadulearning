@@ -12,6 +12,8 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useState, useEffect } from "react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 export const CourseHeader = ({
   course,
   instructorName,
@@ -34,8 +36,10 @@ export const CourseHeader = ({
   useEffect(() => {
     const checkEnrollment = async () => {
       try {
+        if (!user?._id || !course?._id || !token) return;
+
         const res = await axios.get(
-          `http://localhost:5000/api/enrollments/check?studentId=${user._id}&courseId=${course._id}`,
+          `${API_BASE_URL}/api/enrollments/check?studentId=${user._id}&courseId=${course._id}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -51,7 +55,7 @@ export const CourseHeader = ({
       }
     };
 
-    if (user && course?._id) {
+    if (user?._id && course?._id && token) {
       checkEnrollment();
     }
   }, [user, course]);
@@ -60,11 +64,14 @@ export const CourseHeader = ({
   useEffect(() => {
     const fetchStudentCount = async () => {
       try {
-        const res = await axios.post(`/api/courses/${course._id}/student-count`, {}, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        if (!course?._id) return;
+        const res = await axios.post(
+          `${API_BASE_URL}/api/courses/${course._id}/student-count`,
+          {},
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
+        );
         setStudentCount(res.data.studentCount);
       } catch (err) {
         console.error("Failed to fetch student count", err);
@@ -80,12 +87,14 @@ export const CourseHeader = ({
   useEffect(() => {
     const fetchReviewStats = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/review/${course._id}`, {
+        if (!course?._id) return;
+        const res = await axios.get(`${API_BASE_URL}/api/review/${course._id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
           withCredentials: true,
         });
+
         setReviewStats(
           res.data.reviewStats || { totalReviews: 0, avgRating: "N/A" }
         );
@@ -113,22 +122,22 @@ export const CourseHeader = ({
           courseTitle: course.title,
           coursePrice: course.price
         }));
-        
+
         // Show a more user-friendly message
         if (confirm('To enroll in this course, you need to log in or create an account. Would you like to proceed?')) {
-          navigate('/login', { 
-            state: { 
+          navigate('/login', {
+            state: {
               from: 'courseEnrollment',
               courseId: course._id,
               courseTitle: course.title
-            } 
+            }
           });
         }
         return;
       }
 
       const res = await axios.post(
-        "http://localhost:5000/api/payment/initiate",
+        `${API_BASE_URL}/api/payment/initiate`,
         {
           amount: course.price,
           courseId: course._id,
@@ -225,10 +234,11 @@ export const CourseHeader = ({
             <div className="md:w-96">
               <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-xl">
                 <img
-                  src={course.thumbnail.url}
+                  src={course?.thumbnail?.url || course?.thumbnail || ""}
                   alt={course.title}
                   className="w-full h-52 object-cover"
                 />
+
                 <div className="p-6">
                   <div className="flex items-baseline mb-4">
                     <span className="text-2xl font-bold text-green-600">

@@ -1,11 +1,24 @@
 import multer from 'multer';
-import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import cloudinary from 'cloudinary';
+import * as multerStorageCloudinary from 'multer-storage-cloudinary';
 import { config } from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+
+const CloudinaryStorage =
+  multerStorageCloudinary.CloudinaryStorage ||
+  multerStorageCloudinary.default?.CloudinaryStorage ||
+  multerStorageCloudinary.default;
+
+if (!CloudinaryStorage) {
+  throw new Error(
+    "multer-storage-cloudinary: CloudinaryStorage export not found. Check installed version."
+  );
+}
 
 config();
 
-cloudinary.config({
+cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
@@ -36,4 +49,20 @@ const videoStorage = new CloudinaryStorage({
 const upload = multer({ storage: imageStorage });
 const uploadVideo = multer({ storage: videoStorage });
 
-export { upload, uploadVideo };
+const tempVideoDir = path.join(process.cwd(), 'temp', 'videos');
+if (!fs.existsSync(tempVideoDir)) {
+  fs.mkdirSync(tempVideoDir, { recursive: true });
+}
+
+const localVideoStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, tempVideoDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || '';
+    const safeBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9-_]/g, '_');
+    cb(null, `${Date.now()}-${safeBase}${ext}`);
+  }
+});
+
+const uploadVideoLocal = multer({ storage: localVideoStorage });
+
+export { upload, uploadVideo, uploadVideoLocal };

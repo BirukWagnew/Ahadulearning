@@ -23,6 +23,7 @@ const InstructorDashboard = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState([]);
+  const [editingCourseId, setEditingCourseId] = useState(null);
   const [loading, setLoading] = useState({
     courses: false,
     stats: false,
@@ -52,9 +53,12 @@ const InstructorDashboard = () => {
     try {
       setLoading((prev) => ({ ...prev, overall: true, courses: true }));
 
+      const token = localStorage.getItem("token");
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
       // Fetch courses
       const coursesUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/courses/instructor/${user._id}/courses`;
-      const response = await axios.post(coursesUrl, {}, { signal });
+      const response = await axios.post(coursesUrl, {}, { signal, headers: authHeaders });
 
       console.log("[DEBUG] Courses response:", {
         status: response.status,
@@ -72,7 +76,7 @@ const InstructorDashboard = () => {
         response.data.map(async (course) => {
           const statsUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/courses/${user._id}/course/${course._id}/average-progress`;
           try {
-            const statsResponse = await axios.post(statsUrl, {}, { signal });
+            const statsResponse = await axios.post(statsUrl, {}, { signal, headers: authHeaders });
             return {
               ...course,
               progress: statsResponse.data.averageProgress || 0,
@@ -102,7 +106,7 @@ const InstructorDashboard = () => {
         setStats([]);
       }
     } finally {
-      if (!signal.aborted) {
+      if (!signal || !signal.aborted) {
         setLoading({ courses: false, stats: false, overall: false });
         isFetchingRef.current = false;
       }
@@ -174,6 +178,20 @@ const InstructorDashboard = () => {
     toast.success("Course created successfully");
   };
 
+  const handleEditCourse = (course) => {
+    const id = course?._id || course?.id;
+    if (!id) return;
+    setEditingCourseId(id);
+    setActiveTab("courses");
+    setMainTab("create");
+  };
+
+  const handleViewCourse = (course) => {
+    const id = course?._id || course?.id;
+    if (!id) return;
+    window.open(`/courses/${id}`, "_self");
+  };
+
   return (
     <div className="min-h-screen flex dark:bg-slate-950">
       <Sidebar
@@ -230,6 +248,8 @@ const InstructorDashboard = () => {
                           <CourseTable
                             courses={courses}
                             onViewAll={() => setActiveTab("courses")}
+                            onEdit={handleEditCourse}
+                            onView={handleViewCourse}
                           />
                         </div>
                       </div>
@@ -256,10 +276,12 @@ const InstructorDashboard = () => {
                       onCreate={() => setMainTab("create")}
                       showStatus={true}
                       showActions={true}
+                      onEdit={handleEditCourse}
+                      onView={handleViewCourse}
                     />
                   </TabsContent>
                   <TabsContent value="create">
-                    <CourseBuilder onSave={handleCourseCreated} />
+                    <CourseBuilder onSave={handleCourseCreated} initialCourseId={editingCourseId} />
                   </TabsContent>
                 </Tabs>
               )}

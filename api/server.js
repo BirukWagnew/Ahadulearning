@@ -2,6 +2,7 @@ import withdrawalRoutes from './routes/PaymentRoutes/withdrawalRoutes.js';
 import progressRoutes from './routes/instructor-Routes/progressRoutes.js';
 import quizRoutes from './routes/instructor-Routes/quizRoutes.js';
 import enrollmentRoutes from './routes/instructor-Routes/enrollmentRoutes.js';
+import mediaRoutes from './routes/instructor-Routes/mediaRoutes.js';
 
 import express from "express";
 import http from "http";
@@ -148,8 +149,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', instructorRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/quizzes', quizRoutes);
+app.use('/api/lessons', quizRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/media', mediaRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api', routes);
 app.use('/api/payment', paymentRoutes);

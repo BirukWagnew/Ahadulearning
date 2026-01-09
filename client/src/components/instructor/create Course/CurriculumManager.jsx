@@ -9,7 +9,7 @@ import LessonEditor from "./LessonEditor";
 import { useCourse } from "./CourseProvider";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_UR || "http://localhost:5000/api",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api`,
   withCredentials: true,
 });
 
@@ -361,19 +361,61 @@ const CurriculumManager = ({
                 onQuizQuestionsChange={(questions) => {
                   setCurrentQuizQuestions(questions);
                   if (selectedLesson) {
-                    api.post(`/media/assign/${selectedLesson}`, {
-                      quizQuestions: questions.map((q) => ({
-                        question: q.question,
-                        options: q.options.map((opt) => ({
-                          text: opt.text,
-                          isCorrect: opt.isCorrect,
-                        })),
-                        type: q.type || "single",
-                        lesson: selectedLesson,
-                      })),
-                    }, {
-                      headers: { "Content-Type": "application/json" },
+                    console.log("Saving quiz questions for lesson:", selectedLesson);
+                    console.log("Questions to save:", questions);
+                    
+                    // Validate questions before saving
+                    const validQuestions = questions.filter(q => {
+                      // Check if question has text
+                      if (!q.question || q.question.trim() === '') {
+                        return false;
+                      }
+                      // Check if at least 2 options have text
+                      const validOptions = q.options.filter(opt => opt.text && opt.text.trim() !== '');
+                      if (validOptions.length < 2) {
+                        return false;
+                      }
+                      // Check if at least one option is marked as correct
+                      const hasCorrectAnswer = q.options.some(opt => opt.isCorrect);
+                      if (!hasCorrectAnswer) {
+                        return false;
+                      }
+                      return true;
+                    });
+                    
+                    if (validQuestions.length === 0) {
+                      toast.error("Please add at least one complete question with text, at least 2 options, and a correct answer");
+                      return;
+                    }
+                    
+                    if (validQuestions.length < questions.length) {
+                      toast.warning("Only complete questions will be saved. Make sure all questions have text, at least 2 options, and a correct answer.");
+                    }
+                    
+                    // First, ensure the lesson is set as quiz type
+                    api.put(`/lessons/${selectedLesson}`, {
+                      type: "quiz"
                     }).then(() => {
+                      console.log("Lesson type set to quiz");
+                      
+                      // Save each valid quiz question individually
+                      const savePromises = validQuestions.map((q) => 
+                        api.post(`/lessons/${selectedLesson}/questions`, {
+                          question: q.question,
+                          options: q.options.map((opt) => ({
+                            text: opt.text,
+                            isCorrect: opt.isCorrect,
+                          })),
+                          type: q.type || "single",
+                          points: q.points || 1,
+                        }, {
+                          headers: { "Content-Type": "application/json" },
+                        })
+                      );
+                      
+                      return Promise.all(savePromises);
+                    }).then((results) => {
+                      console.log("Quiz questions saved successfully:", results);
                       setModules((prevModules) =>
                         prevModules.map((module) =>
                           module.lessons?.some((lesson) => lesson._id === selectedLesson)
@@ -381,18 +423,18 @@ const CurriculumManager = ({
                                 ...module,
                                 lessons: module.lessons.map((lesson) =>
                                   lesson._id === selectedLesson
-                                    ? { ...lesson, quizQuestions: questions }
+                                    ? { ...lesson, quizQuestions: validQuestions, type: "quiz" }
                                     : lesson
                                 ),
                               }
                             : module
                         )
                       );
-                      toast.success("Quiz questions saved successfully");
+                      toast.success(`${validQuestions.length} quiz question(s) saved successfully`);
                     }).catch((error) => {
+                      console.error("Quiz questions save error:", error);
                       toast.error(error.response?.data?.message || "Failed to save quiz questions");
                     });
-                    updateLesson(selectedModule, selectedLesson, "quizQuestions", questions);
                   }
                 }}
                 onReplaceLessonClick={(moduleId, lessonId) => {

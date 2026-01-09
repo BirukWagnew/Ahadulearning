@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Book, BookOpen, UploadCloud } from "lucide-react";
 import CourseProvider, { useCourse } from "./CourseProvider";
@@ -11,8 +11,17 @@ import { toast } from "sonner";
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URk || "http://localhost:5000/api",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api`,
   withCredentials: true,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 const InnerCourseBuilder = ({
@@ -40,6 +49,27 @@ const InnerCourseBuilder = ({
   fileInputRef,
 }) => {
   const { courseId, setCourseId } = useCourse();
+  
+  console.log("InnerCourseBuilder activeTab:", activeTab);
+  
+  const handleTabChange = (newTab) => {
+    console.log("Tab changing from", activeTab, "to", newTab);
+    setActiveTab(newTab);
+  };
+
+  useEffect(() => {
+    if (!courseId) {
+      setModules([]);
+      setSelectedModule(null);
+      setSelectedLesson(null);
+      setCurrentQuizQuestions([]);
+      setVideoUploads([]);
+      setUploadProgress({});
+      setIsPublished(false);
+      setLessonToReplace(null);
+      setShowReplaceDialog(false);
+    }
+  }, [courseId, setCurrentQuizQuestions, setIsPublished, setLessonToReplace, setModules, setSelectedLesson, setSelectedModule, setShowReplaceDialog, setUploadProgress, setVideoUploads]);
 
   const handleReplaceLessonWithVideo = () => {
     if (!lessonToReplace) return;
@@ -107,20 +137,19 @@ const InnerCourseBuilder = ({
 
       const videoData = uploadRes.data;
 
-      const assignRes = await api.put(`/media/assign/${lessonId}`, {
-        videoId: videoData.id,
+      // Update lesson directly with video data (skip media assignment for now)
+      const lessonUpdateRes = await api.put(`/lessons/${lessonId}`, {
+        title: lessonToReplace?.title || "Updated Lesson",
         videoUrl: videoData.url,
         thumbnailUrl: videoData.thumbnail,
         duration: videoData.duration,
-        videoPublicId: videoData.id,
-        thumbnailPublicId: videoData.thumbnail
-          .split("/")
-          .slice(-2)
-          .join("/")
-          .replace(/\.[^/.]+$/, ""),
+        type: "video",
+        status: "complete"
       }, {
         headers: { "Content-Type": "application/json" },
       });
+
+      console.log("Lesson updated directly:", lessonUpdateRes.data);
 
       setModules((prevModules) =>
         prevModules.map((module) => {
@@ -131,10 +160,9 @@ const InnerCourseBuilder = ({
               lesson._id === lessonId
                 ? {
                     ...lesson,
-                    videoId: videoData.id,
-                    videoUrl: assignRes.data.lesson.video.url,
-                    thumbnailUrl: assignRes.data.lesson.video.thumbnailUrl,
-                    duration: assignRes.data.lesson.duration,
+                    videoUrl: videoData.url,
+                    thumbnailUrl: videoData.thumbnail,
+                    duration: videoData.duration,
                     status: "complete",
                     type: "video",
                   }
@@ -167,7 +195,7 @@ const InnerCourseBuilder = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <TabsList className="grid grid-cols-3 mb-1">
             <TabsTrigger value="details" className="flex items-center gap-2">
@@ -240,7 +268,7 @@ const InnerCourseBuilder = ({
   );
 };
 
-const CourseBuilder = ({ onSave }) => {
+const CourseBuilder = ({ onSave, initialCourseId = null }) => {
   const [activeTab, setActiveTab] = useState("details");
   const [modules, setModules] = useState([]);
   const [selectedModule, setSelectedModule] = useState(null);
@@ -255,7 +283,7 @@ const CourseBuilder = ({ onSave }) => {
   const fileInputRef = useRef(null);
 
   return (
-    <CourseProvider>
+    <CourseProvider initialCourseId={initialCourseId}>
       <InnerCourseBuilder
         activeTab={activeTab}
         setActiveTab={setActiveTab}

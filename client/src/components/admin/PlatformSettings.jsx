@@ -13,8 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
 
 const PlatformSettings = () => {
+  const { refreshUser } = useAuth();
   const [user, setUser] = useState({
     profilePic: "",
     name: "",
@@ -40,18 +42,10 @@ const PlatformSettings = () => {
         toast.error("Please log in to view your profile");
         return;
       }
-  
-      let userId;
-      try {
-        const tokenPayload = JSON.parse(atob(token.split(".")[1]));
-        userId = tokenPayload.id;
-       } catch (error) {
-        toast.error("Invalid token format");
-        return;
-      }
-  
-      const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/users/${userId}`;
-   
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+      const apiUrl = `${API_BASE_URL}/api/users/profile`;
+
       try {
         setIsLoading(true);
         const response = await axios.get(apiUrl, {
@@ -69,18 +63,22 @@ const PlatformSettings = () => {
           email: userData.email || "",
           bio: userData.bio || "",
         }));
-        const fullProfilePicUrl = userData.profilePic && typeof userData.profilePic === 'string'
-        ? `${userData.profilePic}` 
-        : "/avatars/default-avatar.jpg";
+        const raw = userData.profilePic;
+        const fullProfilePicUrl =
+          raw && typeof raw === "string"
+            ? raw.startsWith("http")
+              ? raw
+              : `${API_BASE_URL}${raw}`
+            : "/avatars/default-avatar.jpg";
   
       
          
-           console.log("Profile Pic URL:", fullProfilePicUrl);
-           setAvatarPreview(fullProfilePicUrl);
-           console.log("Avatar Preview Set To:", fullProfilePicUrl);        console.log("Avatar Preview Set To:", fullProfilePicUrl);
+        console.log("Profile Pic URL:", fullProfilePicUrl);
+        setAvatarPreview(fullProfilePicUrl);
+        console.log("Avatar Preview Set To:", fullProfilePicUrl);
       }  catch (error) {
         console.error("API Error:", error.response?.data || error.message);
-        console.log("API Response:", response.data);
+        
 
         toast.error(error.response?.data?.message || error.message || "Failed to fetch user data");
       } finally {
@@ -138,6 +136,8 @@ const PlatformSettings = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
     const formDataToSend = new FormData();
     formDataToSend.append("name", formData.name);
     formDataToSend.append("email", formData.email);
@@ -153,7 +153,7 @@ const PlatformSettings = () => {
 
     try {
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/users/profile`,
+        `${API_BASE_URL}/api/users/profile`,
         formDataToSend,
         {
           headers: {
@@ -165,6 +165,22 @@ const PlatformSettings = () => {
 
       setIsLoading(false);
       toast.success("Profile updated successfully!");
+
+      // Refresh global auth user so Navbar/avatar updates immediately
+      await refreshUser();
+
+      // Re-sync local page state from response (handles new profilePic path)
+      if (response?.data?.user) {
+        setUser(response.data.user);
+        const raw = response.data.user.profilePic;
+        const fullProfilePicUrl =
+          raw && typeof raw === "string"
+            ? raw.startsWith("http")
+              ? raw
+              : `${API_BASE_URL}${raw}`
+            : "";
+        if (fullProfilePicUrl) setAvatarPreview(fullProfilePicUrl);
+      }
     } catch (error) {
       setIsLoading(false);
       toast.error(error.response?.data?.message || "Failed to update profile.");

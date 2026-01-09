@@ -6,12 +6,22 @@ const RelatedCourses = ({ courseId }) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const coursePlaceholder =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
+        <rect width='100%' height='100%' fill='#e2e8f0'/>
+        <g fill='#64748b' font-family='Arial, sans-serif' font-size='14'>
+          <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle'>No image</text>
+        </g>
+      </svg>`
+    );
+
   useEffect(() => {
     const fetchRelatedCourses = async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/recommendations/courses/${courseId}/related`
-        );
+        const response = await axios.get(`${API_BASE_URL}/api/recommendations/courses/${courseId}/related`);
         setCourses(response.data.related || []);
       } catch (error) {
         console.error("Failed to fetch related courses:", error);
@@ -48,9 +58,16 @@ const RelatedCourses = ({ courseId }) => {
           className="flex items-start gap-4 border-b pb-4 last:border-none"
         >
           <img
-            src={course.thumbnail.url || "/default-thumbnail.jpg"}
+            src={(() => {
+              const raw = typeof course.thumbnail === "string" ? course.thumbnail : course.thumbnail?.url;
+              if (!raw) return coursePlaceholder;
+              return raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`;
+            })()}
             alt={course.title}
             className="w-16 h-16 rounded object-cover"
+            onError={(e) => {
+              e.currentTarget.src = coursePlaceholder;
+            }}
           />
           <div className="flex-1">
             <h4 className="font-semibold text-sm text-gray-800 leading-snug hover:underline cursor-pointer">

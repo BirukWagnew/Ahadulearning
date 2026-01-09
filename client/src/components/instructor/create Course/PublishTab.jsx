@@ -18,12 +18,15 @@ const PublishTab = ({ courseId, modules, initialPublished }) => {
     try {
       setIsLoading(true);
 
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+      const token = localStorage.getItem("token");
+
       const res = await axios.patch(
-        `/api/courses/${courseId}/status`,
+        `${API_BASE_URL}/api/courses/${courseId}/status`,
         { published: isPublished },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // adjust if using context or cookies
+            Authorization: token ? `Bearer ${token}` : undefined,
           },
         }
       );

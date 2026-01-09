@@ -120,12 +120,29 @@ export const updateLesson = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to update this lesson');
   }
 
-  const { title, description, content, free } = req.body;
+  const { title, description, content, free, videoUrl, thumbnailUrl, duration, type, status } = req.body;
 
   lesson.title = title || lesson.title;
   lesson.description = description || lesson.description;
   lesson.content = content || lesson.content;
   lesson.free = free !== undefined ? free : lesson.free;
+  
+  // Handle video assignment
+  if (videoUrl) {
+    lesson.video = {
+      url: videoUrl,
+      thumbnailUrl: thumbnailUrl,
+      duration: duration
+    };
+  }
+  
+  if (type) {
+    lesson.type = type;
+  }
+  
+  if (status) {
+    lesson.status = status;
+  }
 
   const updatedLesson = await lesson.save();
   res.json(updatedLesson);

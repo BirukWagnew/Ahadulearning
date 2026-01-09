@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 export const PaymentButton = ({ courseId, amount, email, firstName, lastName }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -10,21 +12,28 @@ export const PaymentButton = ({ courseId, amount, email, firstName, lastName }) 
     setError(null);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/payment/initialize', {
-        course_id: courseId,
-        amount,
-        email,
-        first_name: firstName,
-        last_name: lastName
-      });
+      const token = localStorage.getItem('token');
+      const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+      const response = await axios.post(
+        `${API_BASE_URL}/api/payment/initiate`,
+        {
+          amount,
+          courseId,
+          email,
+          fullName,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
 
-      if (response.data.success) {
-        window.location.href = response.data.paymentUrl;
+      if (response.data?.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl;
       } else {
-        setError(response.data.error || 'Payment failed');
+        setError(response.data?.message || response.data?.error || 'Payment failed');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Payment error');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Payment error');
     } finally {
       setLoading(false);
     }

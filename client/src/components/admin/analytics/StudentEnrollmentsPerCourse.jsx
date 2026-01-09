@@ -84,9 +84,19 @@ const StudentEnrollmentsPerCourse = () => {
           }
         );
         
+        console.log("Enrollment API Response:", response.data);
 
         // Add categories to enrollment data
-        const dataWithCategories = response.data.map((item) => ({
+        const responseData = response.data;
+        const enrollmentArray = responseData.courses || responseData; // Handle both response formats
+        
+        if (!Array.isArray(enrollmentArray)) {
+          console.error("Expected array but got:", typeof enrollmentArray, enrollmentArray);
+          setError("Invalid response format from server");
+          return;
+        }
+        
+        const dataWithCategories = enrollmentArray.map((item) => ({
           ...item,
           category: item.category || mapCourseToCategory(item.courseTitle),
         }));

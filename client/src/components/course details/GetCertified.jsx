@@ -11,19 +11,20 @@ const GetCertified = () => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
+        const token = localStorage.getItem("token");
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
         const [courseRes, progressRes] = await Promise.all([
-          fetch(`/api/courses/${courseId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+          fetch(`${API_BASE_URL}/api/courses/${courseId}`),
+          fetch(`${API_BASE_URL}/api/progress/${studentId}/${courseId}`, {
+            headers: authHeaders,
           }),
-          fetch(`/api/progress/${studentId}/${courseId}`),
         ]);
 
         if (!courseRes.ok || !progressRes.ok) {
@@ -57,7 +58,13 @@ const GetCertified = () => {
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(`/api/certificates/generate-certificate/${studentId}/${courseId}`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_BASE_URL}/api/certificates/generate-certificate/${studentId}/${courseId}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
       if (!response.ok) {
         throw new Error("Failed to generate certificate");
       }
@@ -78,7 +85,9 @@ const GetCertified = () => {
 
       const data = await response.json();
       if (data.certificateUrl) {
-        const fileUrl = `http://localhost:5000${data.certificateUrl}`;
+        const fileUrl = data.certificateUrl.startsWith("http")
+          ? data.certificateUrl
+          : `${API_BASE_URL}${data.certificateUrl}`;
         const fileResponse = await fetch(fileUrl);
         if (!fileResponse.ok) {
           throw new Error("Failed to fetch certificate file");

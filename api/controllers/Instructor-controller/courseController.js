@@ -187,7 +187,7 @@ export const getInstructorCourses = async (req, res) => {
     });
 
     if (!courses || courses.length === 0) {
-      return res.status(404).json({ message: "No courses found for this instructor" });
+      return res.status(200).json([]);
     }
 
     res.status(200).json(courses);
@@ -266,7 +266,8 @@ export const updateCourse = asyncHandler(async (req, res) => {
     throw new Error('Course not found');
   }
 
-  if (course.instructor.toString() !== req.user._id.toString()) {
+  const isAdmin = req.user?.role === 'admin';
+  if (!isAdmin && course.instructor.toString() !== req.user._id.toString()) {
     res.status(401);
     throw new Error('Not authorized to update this course');
   }
@@ -305,7 +306,8 @@ export const setCourseStatus = asyncHandler(async (req, res) => {
     throw new Error("Course not found");
   }
 
-  if (course.instructor.toString() !== req.user._id.toString()) {
+  const isAdmin = req.user?.role === 'admin';
+  if (!isAdmin && course.instructor.toString() !== req.user._id.toString()) {
     res.status(401);
     throw new Error("Not authorized to update this course");
   }
@@ -336,7 +338,8 @@ export const deleteCourse = asyncHandler(async (req, res) => {
     throw new Error('Course not found');
   }
 
-  if (course.instructor.toString() !== req.user._id.toString()) {
+  const isAdmin = req.user?.role === 'admin';
+  if (!isAdmin && course.instructor.toString() !== req.user._id.toString()) {
     res.status(401);
     throw new Error('Not authorized to delete this course');
   }
@@ -379,7 +382,7 @@ export const getInstructorCoursesWithProgress = async (req, res) => {
     const courses = await Course.find({ instructor: instructorId });
 
     if (!courses || courses.length === 0) {
-      return res.status(404).json({ message: 'No courses found for this instructor' });
+      return res.status(200).json({ instructorId, courses: [] });
     }
 
     // Fetch progress and enrollment data for each course and its enrolled students
@@ -508,6 +511,10 @@ export const setCourseVisibility = async (req, res) => {
   const { isActive } = req.body;
 
   try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admins only.' });
+    }
+
     const course = await Course.findByIdAndUpdate(
       id,
       { isActive },
@@ -544,7 +551,7 @@ export const getAllCourses = async (req, res) => {
 
     let filter = {};
     if (publish === 'true') {
-      filter.publish = true;
+      filter.published = true;
     }
 
     const courses = await Course.find(filter).sort({ createdAt: -1 });

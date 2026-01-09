@@ -1,16 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 
 const VerifyPayment = () => {
   const { tx_ref } = useParams();
+  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState('loading');
   const [payment, setPayment] = useState(null);
+
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const fetchPayment = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/payment/verify-payment/${tx_ref}`);
+        const token = localStorage.getItem('token');
+        const courseId = searchParams.get('course') || searchParams.get('course_id') || '';
+
+        const res = await axios.get(`${API_BASE_URL}/api/payment/verify-payment/${tx_ref}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          params: courseId ? { course_id: courseId } : {},
+        });
         setPayment(res.data);
         setStatus('success');
       } catch (error) {
@@ -19,7 +28,7 @@ const VerifyPayment = () => {
     };
 
     fetchPayment();
-  }, [tx_ref]);
+  }, [tx_ref, searchParams]);
 
   if (status === 'loading') return <div className="text-center mt-10 text-lg">Verifying payment...</div>;
   if (status === 'failed') return <div className="text-center mt-10 text-red-600 text-lg">Payment not found or failed to verify.</div>;

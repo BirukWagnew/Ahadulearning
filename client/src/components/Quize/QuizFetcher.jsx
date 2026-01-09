@@ -5,14 +5,25 @@ import QuizView from "./QuizView"; // Adjust path if necessary
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const QuizFetcher = ({ lessonId }) => {
+const QuizFetcher = ({ lessonId, studentId, courseId, onComplete }) => {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/quizzes/6800c842590c687df2300c2a/questions`);
+        if (!lessonId) {
+          setQuestions([]);
+          return;
+        }
+
+        const token = localStorage.getItem("token");
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_BASE_URL}/api/lessons/${lessonId}/questions`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
+        );
         setQuestions(res.data);
       } catch (error) {
         console.error("Error fetching quiz questions:", error);
@@ -36,10 +47,10 @@ const QuizFetcher = ({ lessonId }) => {
 
   return (
     <QuizView
-      questions={questions}
-      onComplete={(score) => {
-        console.log("Quiz completed with score:", score);
-      }}
+      lesson_id={lessonId}
+      studentId={studentId}
+      courseId={courseId}
+      onComplete={onComplete}
     />
   );
 };

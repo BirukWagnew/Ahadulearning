@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import axios from 'axios';
 
 const PaymentSuccess = () => {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,7 @@ const PaymentSuccess = () => {
       
       // Request PDF from backend
       const response = await axios.get(
-        `http://localhost:5000/api/payment/receipt/${txRef}`,
+        `${API_BASE_URL}/api/payment/receipt/${txRef}`,
         {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -76,7 +77,7 @@ const PaymentSuccess = () => {
         if (!token) throw new Error('Authentication required');
 
         const response = await axios.get(
-          `http://localhost:5000/api/payment/verify-payment/${txRef}`,
+          `${API_BASE_URL}/api/payment/verify-payment/${txRef}`,
           {
             headers: { 
               Authorization: `Bearer ${token}`,

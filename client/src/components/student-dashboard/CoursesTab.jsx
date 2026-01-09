@@ -6,6 +6,30 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
+import { toast } from "sonner";
+
+// Create axios instance with auth headers
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+// Add auth interceptor
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export const CoursesTab = () => {
   const { user } = useAuth();
@@ -15,17 +39,36 @@ export const CoursesTab = () => {
   const [activeFilter, setActiveFilter] = useState("all");
   const navigate = useNavigate();
 
+  const coursePlaceholder =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'>
+        <rect width='100%' height='100%' fill='#e2e8f0'/>
+        <g fill='#64748b' font-family='Arial, sans-serif' font-size='20'>
+          <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle'>No image</text>
+        </g>
+      </svg>`
+    );
+
   // Fetch enrolled courses
   useEffect(() => {
     const fetchCourses = async () => {
-      if (!user?._id) return;
+      if (!user?._id) {
+        console.log("No user ID found, skipping course fetch");
+        return;
+      }
 
       setIsLoading(true);
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/enrollments/${user._id}/courses`);
+        console.log("Fetching courses for user:", user._id);
+        const response = await api.get(`/api/enrollments/${user._id}/courses`);
+        console.log("Courses response:", response.data);
         setCourses(response.data);
       } catch (error) {
         console.error("Failed to fetch enrolled courses:", error);
+        console.error("Error response:", error.response?.data);
+        console.error("Error status:", error.response?.status);
+        toast.error("Failed to load your courses. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -46,7 +89,7 @@ export const CoursesTab = () => {
         await Promise.all(
           courses.map(async (course) => {
             try {
-              const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/progress/${user._id}/${course._id}`);
+              const res = await api.get(`/api/progress/${user._id}/${course._id}`);
               updatedProgressMap[course._id] = res.data;
             } catch (err) {
               console.error(`Progress fetch failed for course ${course._id}:`, err);
@@ -265,12 +308,14 @@ export const CoursesTab = () => {
                       <div className="h-40 bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
                         <img
                           src={
-                            course.thumbnail?.url || "/placeholder-course.jpg"
+                            (typeof course.thumbnail === 'string'
+                              ? course.thumbnail
+                              : course.thumbnail?.url) || coursePlaceholder
                           }
                           alt={course.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
-                            e.target.src = "/placeholder-course.jpg";
+                            e.currentTarget.src = coursePlaceholder;
                           }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-80" />
@@ -281,13 +326,11 @@ export const CoursesTab = () => {
                           <h4 className="font-semibold text-slate-900 dark:text-white line-clamp-2">
                             {course.title}
                           </h4>
-                          
                           {course.level && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 ml-2">
                               {course.level}
                             </span>
                           )}
-                          
                         </div>
 
                         <div className="mb-4">
@@ -311,9 +354,8 @@ export const CoursesTab = () => {
                         </div>
 
                         <Button onClick={() => handleRedirect(course, isCompleted)}>
-  {isCompleted ? "Get Certificate" : "Continue Learning"}
-</Button>
-
+                          {isCompleted ? "Get Certificate" : "Continue Learning"}
+                        </Button>
 
                         <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-2">
                           <BookOpen className="h-4 w-4 mr-1.5" />
@@ -328,6 +370,7 @@ export const CoursesTab = () => {
                 })}
               </div>
             )}
+
           </section>
         </div>
       </div>

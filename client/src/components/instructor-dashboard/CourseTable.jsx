@@ -9,7 +9,33 @@ import {
 } from "@/components/ui/table";
 import { ChevronRight, Plus } from "lucide-react";
 
-const CourseTable = ({ courses = [], onViewAll, onCreate, showStatus = false, showActions = false }) => {
+const CourseTable = ({
+  courses = [],
+  onViewAll,
+  onCreate,
+  showStatus = false,
+  showActions = false,
+  onEdit,
+  onView,
+}) => {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const thumbnailPlaceholder =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='54'>
+        <rect width='100%' height='100%' fill='#e2e8f0'/>
+        <g fill='#64748b' font-family='Arial, sans-serif' font-size='10'>
+          <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle'>No image</text>
+        </g>
+      </svg>`
+    );
+
+  const resolveThumbnail = (course) => {
+    const raw = typeof course?.thumbnail === "string" ? course.thumbnail : course?.thumbnail?.url;
+    if (!raw) return "";
+    return raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`;
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
       <div className="flex justify-between items-center mb-4">
@@ -30,6 +56,7 @@ const CourseTable = ({ courses = [], onViewAll, onCreate, showStatus = false, sh
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[92px]">Image</TableHead>
               <TableHead>Course</TableHead>
               <TableHead className="hidden sm:table-cell">Students</TableHead>
               <TableHead>Progress</TableHead>
@@ -43,7 +70,18 @@ const CourseTable = ({ courses = [], onViewAll, onCreate, showStatus = false, sh
           <TableBody>
             {Array.isArray(courses) && courses.length > 0 ? (
               courses.map((course) => (
-                <TableRow key={course.id}>
+                <TableRow key={course._id || course.id}>
+                  <TableCell>
+                    <img
+                      src={resolveThumbnail(course) || thumbnailPlaceholder}
+                      alt={course.title || "Course"}
+                      className="h-12 w-20 object-cover rounded-md border border-slate-200 dark:border-slate-700"
+                      onError={(e) => {
+                        e.currentTarget.src = thumbnailPlaceholder;
+                      }}
+                      loading="lazy"
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{course.title}</TableCell>
                   <TableCell className="hidden sm:table-cell">
                     {course.students}
@@ -80,15 +118,28 @@ const CourseTable = ({ courses = [], onViewAll, onCreate, showStatus = false, sh
                     <TableCell>
                       {showActions ? (
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEdit?.(course)}
+                          >
                             Edit
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onView?.(course)}
+                          >
                             View
                           </Button>
                         </div>
                       ) : (
-                        <Button variant="ghost" size="sm" className="p-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-0"
+                          onClick={() => onView?.(course)}
+                        >
                           <ChevronRight size={16} />
                         </Button>
                       )}
@@ -98,7 +149,7 @@ const CourseTable = ({ courses = [], onViewAll, onCreate, showStatus = false, sh
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-6">
+                <TableCell colSpan={7} className="text-center py-6">
                   No courses found.
                 </TableCell>
               </TableRow>

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { ReviewModal } from "./ReviewModal";
 import { toast } from "sonner";
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 // Enrollment check hook
 const useEnrollment = (studentId, courseId) => {
@@ -311,7 +311,10 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
     let nextLesson = null;
     for (const module of course.modules || []) {
       for (const lesson of module.lessons || []) {
-        if (!progress?.completedLessons?.includes(lesson.id)) {
+        const lessonId = (lesson?._id || lesson?.id)?.toString();
+        const completedIds = (progress?.completedLessons || []).map((id) => id?.toString());
+
+        if (lessonId && !completedIds.includes(lessonId)) {
           nextLesson = lesson;
           break;
         }
@@ -319,8 +322,21 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
       if (nextLesson) break;
     }
 
+    if (!nextLesson) {
+      const firstLesson = course?.modules?.[0]?.lessons?.[0];
+      if (firstLesson) {
+        nextLesson = firstLesson;
+      }
+    }
+
     if (nextLesson) {
-      navigate(`/learn/${course.id}/lesson/${nextLesson.id}`);
+      const resolvedCourseId = (courseId || course?._id || course?.id)?.toString();
+      const resolvedLessonId = (nextLesson?._id || nextLesson?.id)?.toString();
+      if (resolvedCourseId && resolvedLessonId) {
+        navigate(`/learn/${resolvedCourseId}/lesson/${resolvedLessonId}`);
+      } else {
+        navigate(`/courses/${courseId}`);
+      }
     } else {
       navigate(`/courses/${courseId}/complete`);
     }
@@ -423,11 +439,13 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
   );
 };
 
- const NextLesson = ({ modules, completedLessons = [] }) => {
+const NextLesson = ({ modules, completedLessons = [] }) => {
   let nextLesson = null;
   for (const module of modules || []) {
     for (const lesson of module.lessons || []) {
-      if (!completedLessons.includes(lesson.id)) {
+      const lessonId = (lesson?._id || lesson?.id)?.toString();
+      const completedIds = (completedLessons || []).map((id) => id?.toString());
+      if (lessonId && !completedIds.includes(lessonId)) {
         nextLesson = lesson;
         break;
       }
@@ -465,11 +483,12 @@ const CertificationNotice = ({ course, studentId, isCompleted }) => {
   const navigate = useNavigate();
 
   const handleCertificationClick = () => {
-    if (!studentId || !course.id) {
+    const resolvedCourseId = (course?._id || course?.id)?.toString();
+    if (!studentId || !resolvedCourseId) {
       console.error("Student ID or Course ID is undefined.");
       return;
     }
-    navigate(`/get-certified/${course.id}/${studentId}`);
+    navigate(`/get-certified/${resolvedCourseId}/${studentId}`);
   };
 
   return (

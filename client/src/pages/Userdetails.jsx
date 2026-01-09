@@ -33,15 +33,16 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
       if (!userId) return;
       try {
         const token = localStorage.getItem("token");
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/users/${userId}`,
+        const response = await axios.post(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/${userId}`,
+          {},
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           }
         );
-        setUserData(response.data);
+        setUserData(response.data?.user || response.data);
       } catch (error) {
         toast.error("Failed to fetch user data");
         console.error("Axios error:", error.response?.data || error.message);

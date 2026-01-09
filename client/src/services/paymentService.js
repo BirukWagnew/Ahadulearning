@@ -1,10 +1,12 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api/payment'; // Update with your backend URL
+const API_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/payment`;
 
-export const initializePayment = async (paymentData) => {
+export const initializePayment = async (paymentData, token) => {
   try {
-    const response = await axios.post(`${API_URL}/initialize`, paymentData);
+    const response = await axios.post(`${API_URL}/initiate`, paymentData, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     return response.data;
   } catch (error) {
     console.error('Payment initialization error:', error);
@@ -12,9 +14,12 @@ export const initializePayment = async (paymentData) => {
   }
 };
 
-export const verifyPayment = async (txRef) => {
+export const verifyPayment = async (txRef, courseId, token) => {
   try {
-    const response = await axios.get(`${API_URL}/verify?tx_ref=${txRef}`);
+    const response = await axios.get(`${API_URL}/verify-payment/${txRef}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { course_id: courseId },
+    });
     return response.data;
   } catch (error) {
     console.error('Payment verification error:', error);

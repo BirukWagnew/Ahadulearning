@@ -1,14 +1,11 @@
 import express from 'express';
 import { enrollStudent, checkEnrollment,getEnrolledCourses } from '../../controllers/Instructor-controller/enrollmentController.js';
 import Enrollment from '../../models/Enrollment.js';
+import { protect } from '../../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', enrollStudent);
-router.get("/:studentId/courses", getEnrolledCourses);
-router.get('/:studentId/:courseId', checkEnrollment);
-
-router.get('/check', async (req, res) => {
+router.get('/check', protect, async (req, res) => {
     const { studentId, courseId } = req.query;
   
     try {
@@ -19,4 +16,15 @@ router.get('/check', async (req, res) => {
       res.status(500).json({ error: "Server error checking enrollment" });
     }
   });
+
+router.post('/', protect, (req, res, next) => {
+    if (req.user?.role !== 'student') {
+      return res.status(403).json({ error: 'Only students can enroll in courses.' });
+    }
+    return next();
+  }, enrollStudent);
+
+router.get("/:studentId/courses", protect, getEnrolledCourses);
+router.get('/:studentId/:courseId', protect, checkEnrollment);
+
 export default router;

@@ -4,12 +4,13 @@ import { initializePayment } from '../services/paymentService';
 const Payment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const handlePayment = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
+      const token = localStorage.getItem('token');
       const paymentData = {
         amount: '100', // Amount in currency
         currency: 'ETB', // Change as needed
@@ -18,13 +19,13 @@ const Payment = () => {
         last_name: 'Doe', // User's last name
         return_url: window.location.origin + '/payment-success' // Your success URL
       };
-      
-      const response = await initializePayment(paymentData);
-      
-      if (response.success && response.checkoutUrl) {
+
+      const response = await initializePayment(paymentData, token);
+
+      if (response?.checkoutUrl) {
         window.location.href = response.checkoutUrl;
       } else {
-        setError('Failed to initialize payment');
+        setError(response?.message || response?.error || 'Failed to initialize payment');
       }
     } catch (err) {
       setError(err.message || 'Payment initialization failed');
@@ -32,7 +33,7 @@ const Payment = () => {
       setLoading(false);
     }
   };
-  
+
   return (
     <div>
       <h2>Make Payment</h2>

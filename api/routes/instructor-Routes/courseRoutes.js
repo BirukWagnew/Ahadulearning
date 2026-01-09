@@ -14,7 +14,7 @@ import {
   getActiveCourses,
   getAllCourses,
 } from '../../controllers/Instructor-controller/courseController.js';
-import { protect, instructor } from '../../middleware/authMiddleware.js';
+import { protect, instructor, adminAuth } from '../../middleware/authMiddleware.js';
 import { upload } from '../../middleware/uploadToCloudinary.js';
 
 const router = express.Router();
@@ -38,10 +38,10 @@ router.post('/active', getActiveCourses);
 router.post('/:courseId/student-count', getStudentCountForCourse);
 
 // Update course status (PATCH)
-router.patch('/:courseId/status', protect, setCourseStatus);
+router.patch('/:courseId/status', protect, instructor, setCourseStatus);
 
 // Update course visibility (PATCH)
-router.patch('/visibility/:id', setCourseVisibility);
+router.patch('/visibility/:id', adminAuth, setCourseVisibility);
 
 // Get instructor courses with progress (POST)
 router.post('/:instructorId/courses/progress', getInstructorCoursesWithProgress);
@@ -51,6 +51,9 @@ router.post('/:instructorId/course/:courseId/average-progress', getCourseAverage
 
 // Get instructor courses (POST)
 router.post('/instructor/:instructorId/courses', getInstructorCourses);
+
+// Get course by ID (GET)
+router.get('/:id', getCourseById);
 
 // Get course by ID (POST)
 router.post('/:id', getCourseById);

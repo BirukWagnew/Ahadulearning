@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox ";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Check, X, ChevronRight, Loader2, RotateCw } from "lucide-react";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 
 const QuizView = ({ lesson_id, onComplete, studentId, courseId }) => {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [submitted, setSubmitted] = useState(false);
@@ -22,8 +23,12 @@ const QuizView = ({ lesson_id, onComplete, studentId, courseId }) => {
   useEffect(() => {
     const checkEnrollment = async () => {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:5000/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`
+          `${API_BASE_URL}/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
         );
         const data = await response.json();
         setIsEnrolled(data?.isEnrolled || false);
@@ -46,11 +51,28 @@ const QuizView = ({ lesson_id, onComplete, studentId, courseId }) => {
     const fetchQuizQuestions = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/quizzes/${lesson_id}/questions`);
+        const token = localStorage.getItem("token");
+        if (!lesson_id) {
+          setQuestions([]);
+          return;
+        }
+
+        console.log("Fetching questions for lesson:", lesson_id);
+        const response = await fetch(`${API_BASE_URL}/api/lessons/${lesson_id}/questions`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data?.message || data?.error || "Failed to load quiz questions");
+        }
         const data = await response.json();
+        console.log("Received quiz questions:", data);
         setQuestions(data);
       } catch (error) {
-        toast.error("Failed to load quiz questions");
+        console.error("Error fetching quiz questions:", error);
+        toast.error(error?.message || "Failed to load quiz questions");
+        setQuestions([]); // Set empty array on error
       } finally {
         setIsLoading(false);
       }
@@ -116,10 +138,12 @@ const QuizView = ({ lesson_id, onComplete, studentId, courseId }) => {
 
   const saveProgress = async (finalScore) => {
     try {
-      const response = await fetch("http://localhost:5000/api/progress", {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/progress`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           studentId,
@@ -131,7 +155,8 @@ const QuizView = ({ lesson_id, onComplete, studentId, courseId }) => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save progress");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || "Failed to save progress");
       }
 
       return true;
@@ -209,6 +234,17 @@ const QuizView = ({ lesson_id, onComplete, studentId, courseId }) => {
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-fidel-500" />
         <p className="text-sm text-muted-foreground">Loading quiz questions...</p>
+      </div>
+    );
+  }
+
+  if (questions.length === 0 && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-muted-foreground mb-2">No Questions Available</h3>
+          <p className="text-sm text-muted-foreground">This quiz doesn't have any questions yet.</p>
+        </div>
       </div>
     );
   }

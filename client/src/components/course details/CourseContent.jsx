@@ -19,6 +19,8 @@ import VideoPlayer from "@/components/video-player";
 import QuizView from "../Quize/QuizView";
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 export const CourseContent = ({
   modules,
   expandedModules,
@@ -43,14 +45,19 @@ export const CourseContent = ({
       }
 
       try {
+        const token = localStorage.getItem("token");
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
         const enrollmentRes = await axios.get(
-          `/api/enrollments/${studentId}/${courseId}`
+          `${API_BASE_URL}/api/enrollments/${studentId}/${courseId}`,
+          { headers: authHeaders }
         );
         setHasAccess(enrollmentRes.data.access === true);
 
         const progressRes = await axios.get(
-          `/api/progress/${studentId}/${courseId}/completedLessons`,
+          `${API_BASE_URL}/api/progress/${studentId}/${courseId}/completedLessons`,
           {
+            headers: authHeaders,
             validateStatus: (status) => status === 200 || status === 304 || status === 404,
           }
         );
@@ -93,6 +100,7 @@ export const CourseContent = ({
   }, [modules]);
 
   const openPreviewDialog = (lesson) => {
+    console.log("Opening preview dialog for lesson:", lesson);
     setCurrentPreview(lesson);
     setPreviewOpen(true);
   };
@@ -104,13 +112,16 @@ export const CourseContent = ({
 
   const refreshCompletedLessons = async () => {
     try {
+      const token = localStorage.getItem("token");
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await axios.get(
-        `/api/progress/${studentId}/${courseId}/completedLessons`,
+        `${API_BASE_URL}/api/progress/${studentId}/${courseId}/completedLessons`,
         {
+          headers: authHeaders,
           validateStatus: (status) => status === 200 || status === 304 || status === 404,
         }
       );
-      
+
       if (res.status === 200 && Array.isArray(res.data?.completedLessons)) {
         setCompletedLessons(res.data.completedLessons.map(id => id.toString()));
       } else if (res.status === 404) {
@@ -169,6 +180,7 @@ export const CourseContent = ({
           <div className="p-6 pt-0">
             {currentPreview?.type === "quiz" ? (
               <QuizView
+                key={currentPreview._id}
                 lesson_id={currentPreview._id}
                 courseId={courseId}
                 studentId={studentId}

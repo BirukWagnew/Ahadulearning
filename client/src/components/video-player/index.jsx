@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 function VideoPlayer({
   width = "100%",
   height = "100%",
@@ -115,8 +117,12 @@ function VideoPlayer({
   useEffect(() => {
     const checkEnrollment = async () => {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:5000/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`
+          `${API_BASE_URL}/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
         );
         const data = await response.json();
         setIsEnrolled(data?.isEnrolled || false);
@@ -137,10 +143,12 @@ function VideoPlayer({
 
       const updateProgress = async () => {
         try {
-          const response = await fetch("http://localhost:5000/api/progress", {
+          const token = localStorage.getItem("token");
+          const response = await fetch(`${API_BASE_URL}/api/progress`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({
               studentId,

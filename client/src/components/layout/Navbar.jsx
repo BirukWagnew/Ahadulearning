@@ -10,8 +10,20 @@ const Navbar = () => {
   const { user, logout, loading } = useAuth();  // Get user state from AuthContext
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const resolvedAvatarSrc = user?.profilePic
+    ? user.profilePic.startsWith("http")
+      ? user.profilePic
+      : `${API_BASE_URL}${user.profilePic}`
+    : "";
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [resolvedAvatarSrc]);
 
   // Sample navigation links
   const navLinks = [
@@ -138,6 +150,13 @@ const Navbar = () => {
                     size="icon"
                   >
                     <Avatar className="h-9 w-9">
+                      {resolvedAvatarSrc && !avatarFailed ? (
+                        <AvatarImage
+                          src={resolvedAvatarSrc}
+                          alt={user?.name || "User"}
+                          onError={() => setAvatarFailed(true)}
+                        />
+                      ) : null}
                       <AvatarFallback className="bg-fidel-100 text-fidel-700 dark:bg-fidel-900 dark:text-fidel-300">
                         {user.name ? user.name[0].toUpperCase() : "U"}
                       </AvatarFallback>

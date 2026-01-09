@@ -56,24 +56,47 @@ export const initiatePayment = async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized. Student ID missing.' });
   }
 
+  if (req.user?.role !== 'student') {
+    return res.status(403).json({ error: 'Only students can initiate course payments.' });
+  }
+
   // Validate required fields
   if (!amount || !email || !fullName || !courseId) {
-    return res.status(400).json({ error: 'Missing required fields.' });
+    return res.status(400).json({
+      message: 'Missing required fields.',
+      error: 'Missing required fields.',
+    });
   }
 
   // Validate environment variables
-  if (!process.env.BACKEND_URL || !process.env.CHAPA_SECRET_KEY) {
+  if (!process.env.CHAPA_SECRET_KEY || !process.env.FRONTEND_URL) {
     console.error('Missing required environment variables');
-    return res.status(500).json({ error: 'Server configuration error' });
+    return res.status(500).json({
+      message: 'Server configuration error',
+      error: 'Server configuration error',
+      missing: {
+        CHAPA_SECRET_KEY: !process.env.CHAPA_SECRET_KEY,
+        FRONTEND_URL: !process.env.FRONTEND_URL,
+      },
+    });
   }
 
   // Log email for debugging
   console.log('Initiating payment with email:', email);
   console.log('Email length:', email.length);
   console.log('Email content:', email);
-  console.log('Chapa callback_url:', `${process.env.BACKEND_URL}/api/payments/webhook`);
+  console.log('Chapa callback_url:', `${process.env.FRONTEND_URL}/payment-success?course=${courseId}&tx_ref=${tx_ref}`);
 
   try {
+    const courseForOwnershipCheck = await Course.findById(courseId).select('instructor');
+    if (!courseForOwnershipCheck) {
+      return res.status(404).json({ error: 'Course not found.' });
+    }
+
+    if (courseForOwnershipCheck.instructor?.toString() === studentId.toString()) {
+      return res.status(400).json({ error: 'Instructors cannot purchase their own course.' });
+    }
+
     // Step 1: Create a payment record in the database with 'pending' status
     await Payment.create({ studentId, courseId, amount, tx_ref, status: 'pending' });
 
@@ -86,7 +109,7 @@ export const initiatePayment = async (req, res) => {
         email,
         first_name: fullName,
         tx_ref,
-        // callback_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+        // callback_url: `${process.env.FRONTEND_URL}/api/payments/webhook`,
         return_url: `${process.env.FRONTEND_URL}/payment-success?course=${courseId}&tx_ref=${tx_ref}`,
         customization: {
           title: 'FidelHub Payment',
@@ -115,10 +138,14 @@ export const initiatePayment = async (req, res) => {
   } catch (error) {
     // Handle any unexpected errors in the request process
     console.error('CHAPA Error Response:', error.response?.data || error.message);
-    if (error.response?.data) {
+    if (error.response) {
       console.log('Full Chapa Response Data:', error.response.data);
     }
-    res.status(500).json({ error: 'Payment initiation failed' });
+    res.status(500).json({
+      message: 'Payment initiation failed',
+      error: 'Payment initiation failed',
+      details: error.response?.data || error.message,
+    });
   }
 };
 
@@ -222,6 +249,10 @@ export const verifyPayment = async (req, res) => {
   const { tx_ref } = req.params;
   const { course_id } = req.query;
 
+  if (req.user?.role && req.user.role !== 'student') {
+    return res.status(403).json({ error: 'Only students can verify course payments.' });
+  }
+
   // Log incoming data for debugging
   console.log('Verify Payment - Incoming tx_ref:', tx_ref);
   console.log('Verify Payment - Incoming course_id:', course_id);
@@ -287,6 +318,10 @@ export const verifyPayment = async (req, res) => {
     if (!course) {
       console.error('Verify Payment - Course not found for courseId:', course_id);
       return res.status(404).json({ error: 'Course not found' });
+    }
+
+    if (course.instructor?.toString() === existingPayment.studentId?.toString()) {
+      return res.status(400).json({ error: 'Instructors cannot purchase their own course.' });
     }
 
     const instructorId = course.instructor;

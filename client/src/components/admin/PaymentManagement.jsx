@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Card, 
   CardContent, 
@@ -18,117 +18,271 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, FileDown, Check, X, AlertCircle } from "lucide-react";
+import { Search, FileText, FileDown, Check, X, AlertCircle, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
 
 const PaymentManagement = () => {
   const [activeTab, setActiveTab] = useState("transactions");
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Mock transactions data
-  const transactions = [
-    { 
-      id: "TX-12345",
-      date: "2023-05-20",
-      student: "Alex Johnson",
-      course: "Introduction to React",
-      amount: 49.99,
-      instructor: "David Chen",
-      status: "completed"
-    },
-    { 
-      id: "TX-12346",
-      date: "2023-05-19",
-      student: "Emma Wilson",
-      course: "Advanced JavaScript Patterns",
-      amount: 79.99,
-      instructor: "Lisa Wang",
-      status: "completed"
-    },
-    { 
-      id: "TX-12347",
-      date: "2023-05-18",
-      student: "Michael Brown",
-      course: "UX Design Fundamentals",
-      amount: 59.99,
-      instructor: "Emily Rodriguez",
-      status: "failed"
-    },
-    { 
-      id: "TX-12348",
-      date: "2023-05-17",
-      student: "James Moore",
-      course: "Digital Marketing Strategy",
-      amount: 49.99,
-      instructor: "Sarah Williams",
-      status: "refunded"
-    },
-    { 
-      id: "TX-12349",
-      date: "2023-05-16",
-      student: "Sophia Garcia",
-      course: "Python for Data Science",
-      amount: 69.99,
-      instructor: "Michael Brown",
-      status: "completed"
-    },
-  ];
-  
-  // Mock payout requests data
-  const payoutRequests = [
-    {
-      id: "PO-5001",
-      date: "2023-05-15",
-      instructor: "David Chen",
-      amount: 320.00,
-      courses: 3,
-      status: "pending"
-    },
-    {
-      id: "PO-5002",
-      date: "2023-05-10",
-      instructor: "Lisa Wang",
-      amount: 480.50,
-      courses: 4,
-      status: "approved"
-    },
-    {
-      id: "PO-5003",
-      date: "2023-05-08",
-      instructor: "Emily Rodriguez",
-      amount: 215.75,
-      courses: 2,
-      status: "completed"
-    },
-    {
-      id: "PO-5004",
-      date: "2023-05-05",
-      instructor: "Sarah Williams",
-      amount: 175.25,
-      courses: 2,
-      status: "pending"
-    },
-  ];
-  
+  const [transactions, setTransactions] = useState([]);
+  const [payoutRequests, setPayoutRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast.error("No authentication token found");
+          return;
+        }
+
+        // Fetch payments and withdrawals in parallel
+        const [paymentsResponse, withdrawalsResponse] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/payments`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/withdrawals`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        // Handle payments response with better error handling
+        if (paymentsResponse.data?.success) {
+          setTransactions(paymentsResponse.data.payments || []);
+        } else if (paymentsResponse.data?.payments) {
+          setTransactions(paymentsResponse.data.payments);
+        } else {
+          console.error("Payments API response:", paymentsResponse.data);
+          setTransactions([]);
+        }
+
+        // Handle withdrawals response with better error handling
+        if (withdrawalsResponse.data?.success) {
+          setPayoutRequests(withdrawalsResponse.data.withdrawals || []);
+        } else if (withdrawalsResponse.data?.withdrawals) {
+          setPayoutRequests(withdrawalsResponse.data.withdrawals);
+        } else {
+          console.error("Withdrawals API response:", withdrawalsResponse.data);
+          setPayoutRequests([]);
+        }
+
+      } catch (err) {
+        console.error("Error fetching payment data:", err);
+        setError("Failed to fetch payment data");
+        toast.error("Failed to load payment data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fidel-600"></div>
+        <span className="ml-2 text-gray-600">Loading payment data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 font-medium">Error loading payment data</p>
+          <p className="text-gray-500 text-sm mt-2">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   // Filter transactions based on search query
-  const filteredTransactions = transactions.filter(transaction => 
-    transaction.student.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.course.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTransactions = transactions.filter(transaction => {
+    const studentName = transaction.studentId?.name || '';
+    const courseTitle = transaction.courseId?.title || '';
+    const transactionId = transaction._id || transaction.tx_ref || '';
+    
+    return (
+      studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      courseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      transactionId.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
   
   // Filter payout requests based on search query
-  const filteredPayouts = payoutRequests.filter(payout => 
-    payout.instructor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    payout.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPayouts = payoutRequests.filter(payout => {
+    const instructorName = payout.user?.name || payout.instructor || '';
+    const payoutId = payout._id || payout.reference || '';
+    
+    return (
+      instructorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      payoutId.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
   
-  const handleApprovePayout = (payoutId) => {
-    toast.success(`Payout ${payoutId} has been approved`);
+  const handleApprovePayout = async (payoutId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_BASE_URL}/api/admin/withdrawals/approve/${payoutId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data?.success) {
+        toast.success(`Withdrawal ${payoutId} approved successfully`);
+        // Update the local state to reflect the change
+        setPayoutRequests(prev => 
+          prev.map(payout => 
+            payout._id === payoutId 
+              ? { ...payout, status: 'success' }
+              : payout
+          )
+        );
+      } else {
+        toast.error(response.data?.message || "Failed to approve withdrawal");
+      }
+    } catch (error) {
+      console.error("Error approving payout:", error);
+      toast.error(`Failed to approve withdrawal: ${error.response?.data?.message || error.message}`);
+    }
   };
   
-  const handleRejectPayout = (payoutId) => {
-    toast.error(`Payout ${payoutId} has been rejected`);
+  const handleRejectPayout = async (payoutId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const reason = prompt("Please enter rejection reason:");
+      if (!reason) return;
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_BASE_URL}/api/admin/withdrawals/reject/${payoutId}`,
+        { reason },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data?.success) {
+        toast.success(`Withdrawal ${payoutId} rejected successfully`);
+        // Update the local state to reflect the change
+        setPayoutRequests(prev => 
+          prev.map(payout => 
+            payout._id === payoutId 
+              ? { ...payout, status: 'failed', responseMessage: reason }
+              : payout
+          )
+        );
+      } else {
+        toast.error(response.data?.message || "Failed to reject withdrawal");
+      }
+    } catch (error) {
+      console.error("Error rejecting payout:", error);
+      toast.error(`Failed to reject withdrawal: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_BASE_URL}/api/admin/payments/report?format=csv`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("Report API Response:", response.data);
+
+      // Handle different response formats
+      let csvData;
+      if (typeof response.data === 'string') {
+        // Direct CSV string response
+        csvData = response.data;
+      } else if (response.data?.data && typeof response.data.data === 'string') {
+        // Nested CSV string response
+        csvData = response.data.data;
+      } else if (response.data?.summary && response.data?.payments && response.data?.withdrawals) {
+        // JSON response - convert to CSV manually
+        const { summary, payments, withdrawals } = response.data;
+        
+        // Create CSV headers
+        const headers = ['Type,ID,Date,User,Amount,Status'];
+        
+        // Convert payments to CSV rows
+        const paymentRows = payments.map(p => [
+          'Payment',
+          p._id || p.tx_ref || '',
+          new Date(p.createdAt || Date.now()).toLocaleDateString(),
+          p.studentId?.name || 'N/A',
+          p.amount?.toFixed(2) || '0.00',
+          p.status || 'unknown'
+        ]);
+        
+        // Convert withdrawals to CSV rows
+        const withdrawalRows = withdrawals.map(w => [
+          'Withdrawal',
+          w._id || w.reference || '',
+          new Date(w.createdAt || Date.now()).toLocaleDateString(),
+          w.user?.name || 'N/A',
+          w.amount?.toFixed(2) || '0.00',
+          w.status || 'unknown'
+        ]);
+        
+        // Combine all rows
+        const allRows = [headers.join(','), ...paymentRows, ...withdrawalRows];
+        csvData = allRows.join('\n');
+      } else {
+        console.error("Unexpected response format:", response.data);
+        toast.error("Invalid response format from server");
+        return;
+      }
+
+      // Create download link for CSV
+      const blob = new Blob([csvData], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `payment-report-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Payment report generated and downloaded");
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast.error("Failed to generate payment report");
+    }
   };
   
   const getStatusBadge = (status) => {
@@ -204,36 +358,48 @@ const PaymentManagement = () => {
           </div>
           
           <TabsContent value="transactions" className="mt-0">
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Transaction ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Course</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Instructor</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTransactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-mono text-xs">{transaction.id}</TableCell>
-                      <TableCell>{transaction.date}</TableCell>
-                      <TableCell>{transaction.student}</TableCell>
-                      <TableCell>{transaction.course}</TableCell>
-                      <TableCell className="font-mono">${transaction.amount.toFixed(2)}</TableCell>
-                      <TableCell>{transaction.instructor}</TableCell>
-                      <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fidel-600"></div>
+                <span className="ml-2 text-gray-600">Loading transactions...</span>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-64">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <p className="text-red-600 font-medium text-center">Error loading payment data</p>
+                <p className="text-gray-500 text-sm mt-2 text-center max-w-md">{error}</p>
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Course</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Instructor</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTransactions.map((transaction) => (
+                      <TableRow key={transaction._id}>
+                        <TableCell className="font-mono text-xs">{transaction._id}</TableCell>
+                        <TableCell>{new Date(transaction.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{transaction.studentId?.name || 'N/A'}</TableCell>
+                        <TableCell>{transaction.courseId?.title || 'N/A'}</TableCell>
+                        <TableCell className="font-mono">${transaction.amount?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell>{transaction.instructorId?.name || 'N/A'}</TableCell>
+                        <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </TabsContent>
-          
           <TabsContent value="payouts" className="mt-0">
             <div className="rounded-md border overflow-hidden">
               <Table>

@@ -5,8 +5,30 @@ import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { uploadToCloudinary, uploadVideoToCloudinary } from './cloudStorage.js';
+import ffprobeStatic from 'ffprobe-static';
+import { createRequire } from 'module';
 
 config();
+
+// Prefer bundled ffmpeg binary (avoids requiring system-wide ffmpeg on Windows)
+try {
+  const require = createRequire(import.meta.url);
+  const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+  if (ffmpegInstaller?.path) {
+    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+  }
+} catch (_e) {
+  // noop
+}
+
+// Prefer bundled ffprobe binary (avoids requiring system-wide ffprobe on Windows)
+try {
+  if (ffprobeStatic?.path) {
+    ffmpeg.setFfprobePath(ffprobeStatic.path);
+  }
+} catch (_e) {
+  // noop
+}
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -22,6 +44,10 @@ export const processVideo = async (filePath, options = {}) => {
   const tempDir = path.join(process.cwd(), 'temp');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('Invalid uploaded file path for video processing');
   }
 
   // Generate thumbnail path in the temp directory
@@ -67,7 +93,11 @@ export const processVideo = async (filePath, options = {}) => {
       duration: Math.round(duration || 0)
     };
   } catch (error) {
-    console.error('Video processing error:', error);
+    if (String(error?.message || '').toLowerCase().includes('cannot find ffprobe')) {
+      console.error('Video processing error: ffprobe not found. Install ffmpeg (includes ffprobe) or add ffprobe to PATH.', error);
+    } else {
+      console.error('Video processing error:', error);
+    }
     throw error;
   } finally {
     // Clean up even if error occurs

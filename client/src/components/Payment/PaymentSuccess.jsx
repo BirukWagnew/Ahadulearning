@@ -9,10 +9,13 @@ const PaymentSuccess = () => {
   
   useEffect(() => {
     const txRef = searchParams.get('tx_ref');
+    const courseId = searchParams.get('course') || searchParams.get('course_id');
+    const token = localStorage.getItem('token');
     if (txRef) {
-      verifyPayment(txRef)
+      verifyPayment(txRef, courseId, token)
         .then(response => {
-          setPaymentStatus(response.success ? 'success' : 'failed');
+          const paymentData = response?.payment || response;
+          setPaymentStatus(paymentData?.status === 'success' ? 'success' : 'failed');
         })
         .catch(() => {
           setPaymentStatus('failed');

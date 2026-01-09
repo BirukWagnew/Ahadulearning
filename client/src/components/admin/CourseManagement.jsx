@@ -41,7 +41,7 @@ const CourseManagement = () => {
         }
 
         const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/courses`,
+          `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -83,7 +83,7 @@ const CourseManagement = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `${import.meta.env.VITE_API_BASE_URL}/api/courses/${courseId}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses/${courseId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -264,6 +264,7 @@ const CourseManagement = () => {
                           variant="ghost"
                           size="sm"
                           className="text-blue-600 hover:text-blue-800"
+                          onClick={() => alert('Edit functionality coming soon!')}
                         >
                           <Edit size={16} />
                         </Button>
