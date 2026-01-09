@@ -63,7 +63,7 @@ ahadulearning/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/solomonMengesh/ahadulearning.git
+git clone https://github.com/BirukWagnew/ahadulearning.git
 cd ahadulearning
 ```
 
