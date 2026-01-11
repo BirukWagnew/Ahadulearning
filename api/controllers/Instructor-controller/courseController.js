@@ -166,11 +166,70 @@ export const getCourses = asyncHandler(async (req, res) => {
       path: 'modules',
       populate: {
         path: 'lessons',
-        select: 'title type duration free'
+        select: 'title type duration free position video quizQuestions'
       }
-    });
-  
-  res.json(courses);
+    })
+    .lean(); // Use lean for better performance
+
+  // Add enrollment counts, status, and other stats for each course
+  const coursesWithStats = await Promise.all(
+    courses.map(async (course) => {
+      try {
+        // Get enrollment count
+        const enrolledStudents = await Enrollment.countDocuments({ courseId: course._id });
+        
+        // Get total lessons count
+        const totalLessons = course.modules?.reduce((total, module) => 
+          total + (module.lessons?.length || 0), 0
+        ) || 0;
+        
+        // Get course status (default to active if not specified)
+        const courseStatus = course.status || 'active';
+        
+        // Get average progress for this course
+        let averageProgress = 0;
+        try {
+          const progressStats = await Enrollment.aggregate([
+            { $match: { courseId: course._id } },
+            { $group: null },
+            { 
+              $group: {
+                _id: null,
+                avgProgress: { $avg: '$progressPercentage' }
+              }
+            }
+          ]);
+          averageProgress = progressStats[0]?.avgProgress || 0;
+        } catch (error) {
+          console.error('Error fetching course progress:', error);
+          averageProgress = 0;
+        }
+        
+        return {
+          ...course.toObject(),
+          enrolledStudents,
+          totalLessons,
+          averageProgress,
+          status: courseStatus,
+          createdAt: course.createdAt,
+          updatedAt: course.updatedAt
+        };
+      } catch (error) {
+        console.error('Error fetching course stats:', error);
+        return {
+          ...course.toObject(),
+          enrolledStudents: 0,
+          totalLessons: 0,
+          averageProgress: 0,
+          status: course.status || 'active',
+          createdAt: course.createdAt,
+          updatedAt: course.updatedAt
+        };
+      }
+    })
+  );
+
+  res.json(coursesWithStats);
 });
 
  

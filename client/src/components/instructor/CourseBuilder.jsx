@@ -554,6 +554,16 @@ const CourseBuilder = ({ onSave }) => {
 
     const fileInputRef = useRef(null);
     const moduleFileInputRef = useRef(null);
+    const quizSaveTimeoutRef = useRef(null);
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (quizSaveTimeoutRef.current) {
+          clearTimeout(quizSaveTimeoutRef.current);
+        }
+      };
+    }, []);
 
     const form = useForm({
       resolver: zodResolver(courseFormSchema),
@@ -906,9 +916,18 @@ const CourseBuilder = ({ onSave }) => {
 
     const handleQuizQuestionsChange = (questions) => {
       setCurrentQuizQuestions(questions);
+      
+      // Clear existing timeout
+      if (quizSaveTimeoutRef.current) {
+        clearTimeout(quizSaveTimeoutRef.current);
+      }
+      
+      // Only save if user has stopped typing for 2 seconds and there's a selected lesson
       if (selectedLesson) {
-        saveQuizQuestions(selectedLesson, questions);
-        updateLesson(selectedModule, selectedLesson, "quizQuestions", questions);
+        quizSaveTimeoutRef.current = setTimeout(() => {
+          saveQuizQuestions(selectedLesson, questions);
+          updateLesson(selectedModule, selectedLesson, "quizQuestions", questions);
+        }, 2000); // Wait 2 seconds after user stops typing
       }
     };
 

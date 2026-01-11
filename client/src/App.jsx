@@ -173,7 +173,7 @@ const App = () => {
           }
         />
         <Route
-          path="/get-certified/:courseId/:studentId"
+          path="/certificate/:courseId/:studentId"
           element={
             <MainLayout>
               <GetCertified />

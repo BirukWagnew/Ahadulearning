@@ -113,9 +113,14 @@ export const CourseHeader = ({
   const handleEnroll = async () => {
     setLoading(true);
 
+    console.log('Enroll button clicked');
+    console.log('Course price:', course.price);
+    console.log('Course data:', course);
+
     try {
       // If not logged in, redirect to login with enrollment intent
       if (!user?.email || !user?.name) {
+        console.log('User not logged in, redirecting to login');
         // Store enrollment intent for after login
         localStorage.setItem('enrollmentIntent', JSON.stringify({
           courseId: course._id,
@@ -136,25 +141,67 @@ export const CourseHeader = ({
         return;
       }
 
-      const res = await axios.post(
-        `${API_BASE_URL}/api/payment/initiate`,
-        {
+      // Check if course is free (price === 0) or premium (price > 0)
+      if (course.price === 0) {
+        console.log('Free course enrollment path');
+        // Free course - enroll directly without payment
+        try {
+          const res = await axios.post(
+            `${API_BASE_URL}/api/enrollments`,
+            {
+              courseId: course._id,
+              studentId: user._id
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (res.data) {
+            // Enrollment successful, refresh the page or update state
+            window.location.reload();
+          } else {
+            alert("Enrollment failed.");
+          }
+        } catch (enrollError) {
+          console.error("Free course enrollment error:", enrollError?.response?.data || enrollError.message);
+          alert("Enrollment failed: " + (enrollError?.response?.data?.message || "Unknown error"));
+        }
+      } else {
+        console.log('Premium course payment initiation path');
+        console.log('Payment data:', {
           amount: course.price,
           courseId: course._id,
           email: user.email,
           fullName: user.name,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
+        });
+        // Premium course - initiate payment
+        const res = await axios.post(
+          `${API_BASE_URL}/api/payment/initiate`,
+          {
+            amount: course.price,
+            courseId: course._id,
+            email: user.email,
+            fullName: user.name,
           },
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-      if (res.data?.checkoutUrl) {
-        window.location.replace(res.data.checkoutUrl);
-      } else {
-        alert("Payment initiation failed.");
+        console.log('Payment response:', res.data);
+
+        if (res.data?.checkoutUrl) {
+          console.log('Redirecting to checkout URL:', res.data.checkoutUrl);
+          window.location.replace(res.data.checkoutUrl);
+        } else {
+          console.error('No checkout URL in response:', res.data);
+          alert("Payment initiation failed.");
+        }
       }
     } catch (error) {
       console.error("Enrollment error:", error?.response?.data || error.message);
@@ -251,7 +298,11 @@ export const CourseHeader = ({
                     onClick={handleEnroll}
                     disabled={loading}
                   >
-                    {loading ? "Processing..." : "Enroll Now"}
+                    {loading 
+                      ? "Processing..." 
+                      : course.price === 0 
+                        ? "Enroll for Free" 
+                        : `Enroll for ETB ${course.price?.toLocaleString()}`}
                   </Button>
 
                   <Button

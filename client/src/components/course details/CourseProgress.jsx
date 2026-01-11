@@ -488,7 +488,7 @@ const CertificationNotice = ({ course, studentId, isCompleted }) => {
       console.error("Student ID or Course ID is undefined.");
       return;
     }
-    navigate(`/get-certified/${resolvedCourseId}/${studentId}`);
+    navigate(`/certificate/${resolvedCourseId}/${studentId}`);
   };
 
   return (

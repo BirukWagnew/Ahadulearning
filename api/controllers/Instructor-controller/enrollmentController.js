@@ -101,9 +101,14 @@ export const getEnrolledCourses = async (req, res) => {
       })
       .exec();
 
-    const successfulEnrollments = enrollments.filter(enrollment => 
-      enrollment.paymentId?.status === 'success' && enrollment.courseId
-    );
+    const successfulEnrollments = enrollments.filter(enrollment => {
+      // For paid courses, check payment status
+      if (enrollment.paymentId) {
+        return enrollment.paymentId.status === 'success' && enrollment.courseId;
+      }
+      // For free courses (no paymentId), just check if course exists
+      return enrollment.courseId;
+    });
 
     if (successfulEnrollments.length === 0) {
       return res.status(200).json([]);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Loader2 } from "lucide-react";
+import { BookOpen, Loader2, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -143,12 +143,17 @@ export const CoursesTab = () => {
   };
   const handleRedirect = (course, isCompleted) => {
     if (isCompleted) {
-      navigate(`/get-certified/${course._id}/${user._id}`);
+      navigate(`/certificate/${course._id}/${user._id}`);
     } else {
       navigate(`/courses/${course._id}`);
     }
   };
-  
+
+  const handleViewAchievements = () => {
+    // Navigate to overview tab which contains achievements
+    navigate('/student-dashboard?tab=overview');
+  };
+
   return (
     <div className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -248,7 +253,8 @@ export const CoursesTab = () => {
               </p>
             )}
 
-            <Button className="w-full" variant="outline">
+            <Button className="w-full" variant="outline" onClick={handleViewAchievements}>
+              <Trophy className="mr-2 h-4 w-4" />
               View All Achievements
             </Button>
           </div>

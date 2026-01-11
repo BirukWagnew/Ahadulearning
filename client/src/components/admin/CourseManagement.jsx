@@ -49,9 +49,15 @@ const CourseManagement = () => {
 
         console.log("🔍 Courses API Response:", response.data);
 
-        if (response.data?.courses) {
+        // Handle different response formats
+        if (Array.isArray(response.data)) {
+          // Direct array response (from enhanced backend)
+          setCourses(response.data);
+        } else if (response.data?.courses) {
+          // Wrapped object response (fallback for old format)
           setCourses(response.data.courses);
         } else if (response.data) {
+          // Direct data response
           setCourses(response.data);
         } else {
           console.log("❌ Invalid courses API response:", response.data);
@@ -144,11 +150,23 @@ const CourseManagement = () => {
                   <label className="text-sm font-medium">Students Enrolled</label>
                   <p className="text-sm text-slate-600 dark:text-slate-400">{selectedCourse.enrolledStudents || 0}</p>
                 </div>
+                <div>
+                  <label className="text-sm font-medium">Total Lessons</label>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{selectedCourse.totalLessons || 0}</p>
+                </div>
               </div>
               
               <div>
                 <label className="text-sm font-medium">Description</label>
                 <p className="text-sm text-slate-600 dark:text-slate-400">{selectedCourse.description}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Status</label>
+                <p className="text-sm text-slate-600 dark:text-slate-400">{selectedCourse.status || 'active'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Created Date</label>
+                <p className="text-sm text-slate-600 dark:text-slate-400">{new Date(selectedCourse.createdAt || selectedCourse.updatedAt).toLocaleDateString()}</p>
               </div>
             </div>
             
@@ -250,6 +268,11 @@ const CourseManagement = () => {
                       >
                         {course.status || 'active'}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        {new Date(course.createdAt || course.updatedAt).toLocaleDateString()}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">

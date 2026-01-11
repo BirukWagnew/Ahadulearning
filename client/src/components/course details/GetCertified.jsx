@@ -4,16 +4,27 @@ import { Award, Download, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const GetCertified = () => {
-  const { studentId, courseId } = useParams();
+  const { courseId, studentId } = useParams();
+  console.log('GetCertified - courseId:', courseId, 'studentId:', studentId);
+  console.log('Current URL:', window.location.href);
   const [course, setCourse] = useState(null);
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const navigate = useNavigate();
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
   useEffect(() => {
+    // Prevent infinite loops by checking if we have valid IDs
+    if (!courseId || !studentId) {
+      console.error('Missing courseId or studentId');
+      setError('Invalid certificate URL');
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setLoading(true);
       setError(null);
@@ -38,6 +49,7 @@ const GetCertified = () => {
 
         setCourse(courseData);
         setProgress(progressData);
+        console.log('Certificate data loaded:', { courseData, progressData });
       } catch (err) {
         console.error("Fetch error:", err);
         setError("Unable to load certification details. Please try again later.");
@@ -45,7 +57,10 @@ const GetCertified = () => {
         setLoading(false);
       }
     };
-    fetchData();
+    
+    // Add a small delay to prevent rapid successive calls
+    const timeoutId = setTimeout(fetchData, 100);
+    return () => clearTimeout(timeoutId);
   }, [studentId, courseId]);
 
   const isCompleted = progress?.progressPercentage === 100;
@@ -57,8 +72,15 @@ const GetCertified = () => {
   const lessonsRemaining = Math.max(totalLessons - completedLessons, 0);
 
   const handleDownload = async () => {
+    if (isDownloading) {
+      console.log('Download already in progress');
+      return;
+    }
+    
+    setIsDownloading(true);
     try {
       const token = localStorage.getItem("token");
+      console.log('Starting certificate download for:', { studentId, courseId });
       const response = await fetch(
         `${API_BASE_URL}/api/certificates/generate-certificate/${studentId}/${courseId}`,
         {
@@ -107,6 +129,8 @@ const GetCertified = () => {
     } catch (err) {
       console.error("Download failed:", err);
       alert(`Error: ${err.message}`);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -213,13 +237,23 @@ const GetCertified = () => {
             <Button
               className="w-full py-6 rounded-xl bg-gradient-to-r from-fidel-600 to-fidel-700 hover:from-fidel-700 hover:to-fidel-800"
               onClick={handleDownload}
+              disabled={isDownloading}
             >
-              <Download className="mr-2 h-5 w-5" />
-              Download Certificate
+              {isDownloading ? (
+                <>
+                  <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-5 w-5" />
+                  Download Certificate
+                </>
+              )}
             </Button>
           ) : (
             <div className="text-center py-4 text-slate-500 text-sm sm:text-base">
-              Complete the course to unlock this feature
+              Complete course to unlock this feature
             </div>
           )}
         </div>
