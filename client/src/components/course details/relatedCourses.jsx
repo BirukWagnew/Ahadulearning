@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Star, Users } from "lucide-react";
 import axios from "axios";
+import { resolveMediaUrl } from "@/lib/media";
 
 const RelatedCourses = ({ courseId }) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failedCourses, setFailedCourses] = useState(() => new Set());
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const coursePlaceholder =
@@ -59,13 +61,20 @@ const RelatedCourses = ({ courseId }) => {
         >
           <img
             src={(() => {
+              if (failedCourses.has(course._id)) return coursePlaceholder;
               const raw = typeof course.thumbnail === "string" ? course.thumbnail : course.thumbnail?.url;
-              if (!raw) return coursePlaceholder;
-              return raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`;
+              const resolved = resolveMediaUrl(raw, API_BASE_URL);
+              if (!resolved) return coursePlaceholder;
+              return `${resolved}${resolved.includes("?") ? "&" : "?"}v=${course?.updatedAt || ""}`;
             })()}
             alt={course.title}
             className="w-16 h-16 rounded object-cover"
             onError={(e) => {
+              setFailedCourses((prev) => {
+                const next = new Set(prev);
+                next.add(course._id);
+                return next;
+              });
               e.currentTarget.src = coursePlaceholder;
             }}
           />

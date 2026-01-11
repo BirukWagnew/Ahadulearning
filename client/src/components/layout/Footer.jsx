@@ -94,7 +94,7 @@ const Footer = () => {
             <address className="not-italic text-sm text-muted-foreground">
             <p>123 Kombolcha Street</p>
             <p>Kombolcha, Ethiopia</p>
-            <p class="mt-2">Email: info@ahadulearning.edu</p>
+            <p className="mt-2">Email: info@ahadulearning.edu</p>
             <p>Phone: +251 33 123 4567</p>
 
             </address>

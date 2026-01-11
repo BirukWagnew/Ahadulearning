@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
+import { resolveMediaUrl } from "@/lib/media";
 
 // Create axios instance with auth headers
 const api = axios.create({
@@ -38,6 +39,8 @@ export const CoursesTab = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
   const navigate = useNavigate();
+
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
   const coursePlaceholder =
     "data:image/svg+xml;charset=utf-8," +
@@ -313,17 +316,20 @@ export const CoursesTab = () => {
                     >
                       <div className="h-40 bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
                         <img
-                          src={
-                            (typeof course.thumbnail === 'string'
-                              ? course.thumbnail
-                              : course.thumbnail?.url) || coursePlaceholder
-                          }
+                          src={(() => {
+                            const raw =
+                              typeof course.thumbnail === "string"
+                                ? course.thumbnail
+                                : course.thumbnail?.url;
+                            return resolveMediaUrl(raw, API_BASE_URL) || coursePlaceholder;
+                          })()}
                           alt={course.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
                             e.currentTarget.src = coursePlaceholder;
                           }}
                         />
+
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-80" />
                       </div>
 

@@ -18,6 +18,10 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   const userId = req.user._id;
   const { name, email, bio } = req.body;
+  const removeProfilePic =
+    req.body?.removeProfilePic === true ||
+    req.body?.removeProfilePic === "true" ||
+    req.body?.removeProfilePic === "1";
   const profilePic = req.file ? `/uploads/avatars/${req.file.filename}` : undefined;
 
   try {
@@ -28,6 +32,7 @@ export const updateProfile = async (req, res) => {
     user.email = email || user.email;
     user.bio = bio || user.bio;
     if (profilePic) user.profilePic = profilePic;
+    if (removeProfilePic && !profilePic) user.profilePic = "";
 
     await user.save();
     res.json({ message: 'Profile updated successfully', user });

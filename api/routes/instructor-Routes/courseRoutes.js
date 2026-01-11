@@ -34,6 +34,9 @@ router.post('/', protect, instructor, upload.single('thumbnail'), createCourse);
 // Get active courses (POST)
 router.post('/active', getActiveCourses);
 
+// Get active courses (GET) - avoid falling through to /:id
+router.get('/active', getActiveCourses);
+
 // Get student count for course (POST)
 router.post('/:courseId/student-count', getStudentCountForCourse);
 

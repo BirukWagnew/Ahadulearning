@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export const StudentSettings = () => {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -16,11 +16,47 @@ export const StudentSettings = () => {
   useEffect(() => {
     // Load user preferences
     if (user) {
-      setDarkMode(localStorage.getItem('darkMode') === 'true');
+      const theme = localStorage.getItem("theme");
+      setDarkMode(theme ? theme === "dark" : localStorage.getItem('darkMode') === 'true');
       setNotifications(localStorage.getItem('notifications') !== 'false');
       setEmailNotifications(localStorage.getItem('emailNotifications') !== 'false');
     }
   }, [user]);
+
+  // Apply theme immediately when toggled
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (darkMode) {
+      root.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+      localStorage.setItem("darkMode", "true");
+    } else {
+      root.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+      localStorage.setItem("darkMode", "false");
+    }
+  }, [darkMode]);
+
+  const handleToggleNotifications = async (nextValue) => {
+    if (nextValue) {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission !== "granted") {
+            toast.error("Notification permission was denied by the browser");
+            setNotifications(false);
+            return;
+          }
+        } catch {
+          toast.error("Failed to request notification permission");
+          setNotifications(false);
+          return;
+        }
+      }
+    }
+
+    setNotifications(nextValue);
+  };
 
   const handleSaveSettings = async () => {
     setIsLoading(true);
@@ -71,7 +107,7 @@ export const StudentSettings = () => {
           label: "Push Notifications",
           type: "toggle",
           value: notifications,
-          onChange: setNotifications,
+          onChange: handleToggleNotifications,
           description: "Receive notifications in your browser",
         },
         {

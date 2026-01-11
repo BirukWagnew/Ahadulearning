@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronRight, Plus } from "lucide-react";
+import { resolveMediaUrl } from "@/lib/media";
 
 const CourseTable = ({
   courses = [],
@@ -32,8 +33,7 @@ const CourseTable = ({
 
   const resolveThumbnail = (course) => {
     const raw = typeof course?.thumbnail === "string" ? course.thumbnail : course?.thumbnail?.url;
-    if (!raw) return "";
-    return raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`;
+    return resolveMediaUrl(raw, API_BASE_URL) || "";
   };
 
   return (

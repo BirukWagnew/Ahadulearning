@@ -19,6 +19,11 @@ function containsBannedContent(text) {
 
 export const checkImageForNSFW = async (imageUrl) => {
   try {
+    // If Sightengine credentials are not configured, skip the check.
+    if (!process.env.SIGHTENGINE_USER || !process.env.SIGHTENGINE_SECRET) {
+      return { isInappropriate: false, details: null };
+    }
+
     const response = await axios.get('https://api.sightengine.com/1.0/check.json', {
       params: {
         models: 'nudity,wad',
@@ -26,6 +31,7 @@ export const checkImageForNSFW = async (imageUrl) => {
         api_user: process.env.SIGHTENGINE_USER,
         api_secret: process.env.SIGHTENGINE_SECRET,
       },
+      timeout: 8000,
     });
 
     const { nudity, weapon, alcohol, drugs } = response.data;
@@ -258,6 +264,11 @@ export const getInstructorCourses = async (req, res) => {
 
  
 export const getCourseById = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    res.status(400);
+    throw new Error('Invalid course ID');
+  }
+
   const course = await Course.findById(req.params.id)
     .populate('instructor', 'name email')
     .populate({
@@ -595,9 +606,26 @@ export const getActiveCourses = async (req, res) => {
   try {
     const courses = await Course.find({ isActive: true })
       .populate("instructor", "name email")
+      .lean()
       .exec();
 
-    res.status(200).json(courses);
+    const normalized = (Array.isArray(courses) ? courses : []).map((course) => {
+      const thumb = course?.thumbnail;
+      const url =
+        (typeof thumb === "string" && thumb) ||
+        (thumb && typeof thumb === "object" && (thumb.url || thumb.path || thumb.secure_url)) ||
+        "";
+      const publicId =
+        (thumb && typeof thumb === "object" && (thumb.publicId || thumb.public_id || thumb.filename)) ||
+        "";
+
+      return {
+        ...course,
+        thumbnail: url ? { url, publicId } : { url: "", publicId: "" },
+      };
+    });
+
+    res.status(200).json(normalized);
   } catch (error) {
     console.error("Error fetching active courses:", error.message);
     res.status(500).json({ error: "Internal Server Error" });

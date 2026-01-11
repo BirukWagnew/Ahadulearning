@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import { resolveMediaUrl } from "@/lib/media";
 
 const PlatformSettings = () => {
   const { refreshUser } = useAuth();
@@ -32,6 +33,7 @@ const PlatformSettings = () => {
     confirmPassword: "",
   });
   const [avatarPreview, setAvatarPreview] = useState(user.profilePic);
+  const [avatarFile, setAvatarFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAvatarLoading, setIsAvatarLoading] = useState(false);
 
@@ -51,6 +53,8 @@ const PlatformSettings = () => {
         const response = await axios.get(apiUrl, {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
           },
         });
   
@@ -64,12 +68,10 @@ const PlatformSettings = () => {
           bio: userData.bio || "",
         }));
         const raw = userData.profilePic;
-        const fullProfilePicUrl =
-          raw && typeof raw === "string"
-            ? raw.startsWith("http")
-              ? raw
-              : `${API_BASE_URL}${raw}`
-            : "/avatars/default-avatar.jpg";
+        const resolved = resolveMediaUrl(raw, API_BASE_URL);
+        const fullProfilePicUrl = resolved
+          ? `${resolved}${resolved.includes("?") ? "&" : "?"}v=${userData?.updatedAt || Date.now()}`
+          : "";
   
       
          
@@ -105,7 +107,7 @@ const PlatformSettings = () => {
   };
 
   const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.match("image.*")) {
@@ -113,23 +115,33 @@ const PlatformSettings = () => {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+    if (file.size > 2 * 1024 * 1024) {
       toast.error("File size should be less than 2MB");
       return;
     }
 
     setIsAvatarLoading(true);
+    setAvatarFile(file);
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAvatarPreview(reader.result);
-      setIsAvatarLoading(false);
-    };
-    reader.readAsDataURL(file);
+    // Use object URL for fast preview
+    setAvatarPreview((prev) => {
+      if (prev && typeof prev === "string" && prev.startsWith("blob:")) {
+        URL.revokeObjectURL(prev);
+      }
+      return URL.createObjectURL(file);
+    });
+
+    setIsAvatarLoading(false);
   };
 
   const handleRemoveAvatar = () => {
-    setAvatarPreview("");
+    setAvatarFile(null);
+    setAvatarPreview((prev) => {
+      if (prev && typeof prev === "string" && prev.startsWith("blob:")) {
+        URL.revokeObjectURL(prev);
+      }
+      return "";
+    });
   };
 
   const handleProfileUpdate = async (e) => {
@@ -143,12 +155,13 @@ const PlatformSettings = () => {
     formDataToSend.append("email", formData.email);
     formDataToSend.append("bio", formData.bio);
 
-    if (avatarPreview && avatarPreview !== user.profilePic) {
-      // Convert data URL to Blob for file upload
-      const blob = await (await fetch(avatarPreview)).blob();
-      formDataToSend.append("profilePic", blob, "avatar.jpg");
-      console.log("User profile pic:", user.profilePic);
+    // If user removed the avatar, tell backend to clear profilePic
+    if (!avatarPreview) {
+      formDataToSend.append("removeProfilePic", "true");
+    }
 
+    if (avatarFile) {
+      formDataToSend.append("profilePic", avatarFile);
     }
 
     try {
@@ -160,6 +173,7 @@ const PlatformSettings = () => {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          timeout: 20000,
         }
       );
 
@@ -173,19 +187,38 @@ const PlatformSettings = () => {
       if (response?.data?.user) {
         setUser(response.data.user);
         const raw = response.data.user.profilePic;
-        const fullProfilePicUrl =
-          raw && typeof raw === "string"
-            ? raw.startsWith("http")
-              ? raw
-              : `${API_BASE_URL}${raw}`
-            : "";
-        if (fullProfilePicUrl) setAvatarPreview(fullProfilePicUrl);
+        const resolved = resolveMediaUrl(raw, API_BASE_URL);
+        const fullProfilePicUrl = resolved
+          ? `${resolved}${resolved.includes("?") ? "&" : "?"}v=${response.data.user?.updatedAt || Date.now()}`
+          : "";
+
+        // Cleanup any blob URL preview
+        setAvatarFile(null);
+        setAvatarPreview((prev) => {
+          if (prev && typeof prev === "string" && prev.startsWith("blob:")) {
+            URL.revokeObjectURL(prev);
+          }
+          return fullProfilePicUrl;
+        });
       }
     } catch (error) {
       setIsLoading(false);
-      toast.error(error.response?.data?.message || "Failed to update profile.");
+      const msg =
+        error.code === "ECONNABORTED"
+          ? "Update timed out. Please try again."
+          : error.response?.data?.message || "Failed to update profile.";
+      toast.error(msg);
     }
   };
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (avatarPreview && typeof avatarPreview === "string" && avatarPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
 
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();

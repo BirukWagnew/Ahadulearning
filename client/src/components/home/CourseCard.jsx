@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Clock, Users, Star, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import PropTypes from "prop-types";
+import { resolveMediaUrl } from "@/lib/media";
 
 const CourseCard = ({
   id,
@@ -48,11 +49,11 @@ const CourseCard = ({
   const instructorName = instructor?.name || "Unknown Instructor";
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const rawImageUrl = typeof thumbnail === "string" ? thumbnail : thumbnail?.url;
-  const imageUrl = rawImageUrl
-    ? rawImageUrl.startsWith("http")
-      ? rawImageUrl
-      : `${API_BASE_URL}${rawImageUrl}`
-    : "";
+  const imageUrl = resolveMediaUrl(rawImageUrl, API_BASE_URL) || "";
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [imageUrl]);
 
   const categoryName = category.split('-').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1)

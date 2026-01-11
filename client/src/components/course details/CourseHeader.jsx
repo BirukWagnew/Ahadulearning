@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useState, useEffect } from "react";
+import { resolveMediaUrl } from "@/lib/media";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -28,6 +29,22 @@ export const CourseHeader = ({
   const [reviewStats, setReviewStats] = useState({ totalReviews: 0, avgRating: "N/A" });
   const [reviewError, setReviewError] = useState(null);
   const navigate = useNavigate();
+
+  const thumbnailPlaceholder =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'>
+        <rect width='100%' height='100%' fill='#e2e8f0'/>
+        <g fill='#64748b' font-family='Arial, sans-serif' font-size='20'>
+          <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle'>No image</text>
+        </g>
+      </svg>`
+    );
+
+  const rawThumbnail =
+    typeof course?.thumbnail === "string" ? course.thumbnail : course?.thumbnail?.url;
+  const resolvedThumbnailSrc =
+    resolveMediaUrl(rawThumbnail, API_BASE_URL) || thumbnailPlaceholder;
 
   const user = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
@@ -281,9 +298,12 @@ export const CourseHeader = ({
             <div className="md:w-96">
               <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-xl">
                 <img
-                  src={course?.thumbnail?.url || course?.thumbnail || ""}
+                  src={resolvedThumbnailSrc || thumbnailPlaceholder}
                   alt={course.title}
                   className="w-full h-52 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = thumbnailPlaceholder;
+                  }}
                 />
 
                 <div className="p-6">

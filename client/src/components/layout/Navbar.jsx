@@ -6,6 +6,7 @@ import { Grid, LogOut, Menu, X } from "react-feather"; // Corrected to use Grid 
 import { Button } from "../ui/button"; // Assuming Button component is available
 import { DropdownMenu, DropdownMenuItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu"; // Assuming DropdownMenu component is available
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { resolveMediaUrl } from "@/lib/media";
 const Navbar = () => {
   const { user, logout, loading } = useAuth();  // Get user state from AuthContext
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -15,10 +16,9 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-  const resolvedAvatarSrc = user?.profilePic
-    ? user.profilePic.startsWith("http")
-      ? user.profilePic
-      : `${API_BASE_URL}${user.profilePic}`
+  const resolvedAvatarSrcRaw = resolveMediaUrl(user?.profilePic || "", API_BASE_URL) || "";
+  const resolvedAvatarSrc = resolvedAvatarSrcRaw
+    ? `${resolvedAvatarSrcRaw}${resolvedAvatarSrcRaw.includes("?") ? "&" : "?"}v=${user?.updatedAt || Date.now()}`
     : "";
 
   useEffect(() => {
