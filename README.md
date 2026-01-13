@@ -5,7 +5,7 @@
 > **AhaduLearning** is a modern, scalable Learning Management System (LMS) built for educational institutions, instructors, and students.  
 > It provides seamless course creation, enrollment, video lessons, quizzes, real-time messaging, and secure online payments.
 
-![AhaduLearning LMS Banner](https://your-image-link-if-you-have-one.com)
+
 
 ---
 
@@ -112,23 +112,16 @@ npm run dev
 # Start frontend
 cd ../client
 npm run dev
-```
+<img width="1872" height="905" alt="Screenshot 2026-01-13 165848" src="https://github.com/user-attachments/assets/e80b3009-f8cb-402a-b558-3c759c496995" />
+<img width="1640" height="794" alt="Screenshot 2026-01-13 142226" src="https://github.com/user-attachments/assets/8c3f01ef-305d-4e0f-9db2-fcd98e70f19b" />
+<img width="1898" height="906" alt="Screenshot 2026-01-13 165924" src="https://github.com/user-attachments/assets/d6ec436a-d4ee-467f-89ef-b29d8759a34d" />
 
----
 
-## 📸 Screenshots
+---<img width="1898" height="906" alt="Screenshot 2026-01-13 165924" src="https://github.com/user-attachments/assets/722dd603-7c20-4c4e-b174-8b9a01b60302" />
+<img width="1887" height="914" alt="Screenshot 2026-01-13 165907" src="https://github.com/user-attachments/assets/6c2ae3d5-d865-4c2e-81ad-5a4460207273" />
+![Uploading Screenshot 2026-01-13 165848.png…]()
+<img width="1640" height="794" alt="Screenshot 2026-01-13 142226" src="https://github.com/user-attachments/assets/5f7b3a43-c604-4597-bb03-9fd1188e7249" />
 
-| Dashboard | Course Details | Payment |
-|-----------|----------------|---------|
-| ![Dashboard](https://your-image-link.com) | ![Course Detail](https://your-image-link.com) | ![Payment](https://your-image-link.com) |
-
----
-
-## 📑 API Documentation
-
-Coming soon — API reference will be available via Postman collection and Swagger UI.
-
----
 
 ## 💳 Payment Integration (Chapa)
 
@@ -136,17 +129,6 @@ Coming soon — API reference will be available via Postman collection and Swagg
 - Payment is verified on the backend via **Chapa Webhook**.
 - Enrollment is granted after successful payment verification.
 
----
-
-## 👥 Contributing
-
-We welcome contributions!
-
-- Fork the repository
-- Create your feature branch (`git checkout -b feature/AmazingFeature`)
-- Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-- Push to the branch (`git push origin feature/AmazingFeature`)
-- Open a Pull Request
 
 ---
 
@@ -157,14 +139,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 ## 📬 Contact
-
-
-
----
-
-# Support the Project!
-
-If you like this project, consider giving it a ⭐️ star on GitHub to help others discover it!
+@Biruk_Wg telegram
 
 ---
 
