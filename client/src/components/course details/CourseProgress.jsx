@@ -294,9 +294,19 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
         </p>
         <Button 
           className="w-full bg-fidel-500 hover:bg-fidel-600"
-          onClick={() => navigate(`/courses/${courseId}/enroll`)}
+          onClick={() => {
+            // Navigate to first lesson directly for enrollment
+            const firstLesson = course?.modules?.[0]?.lessons?.[0];
+            if (firstLesson) {
+              const resolvedCourseId = (courseId || course?._id || course?.id)?.toString();
+              const resolvedLessonId = (firstLesson?._id || firstLesson?.id)?.toString();
+              navigate(`/learn/${resolvedCourseId}/lesson/${resolvedLessonId}`);
+            } else {
+              navigate(`/courses/${courseId}`);
+            }
+          }}
         >
-          Enroll Now
+          Start Course
         </Button>
       </div>
     );

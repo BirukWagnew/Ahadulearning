@@ -18,6 +18,7 @@ import {
 import VideoPlayer from "@/components/video-player";
 import QuizView from "../Quize/QuizView";
 import axios from "axios";
+import { getCategoryImage } from "@/utils/categoryImages";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -29,6 +30,7 @@ export const CourseContent = ({
   freePreviewMode,
   courseId,
   studentId,
+  courseCategory,
 }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [currentPreview, setCurrentPreview] = useState(null);
@@ -162,6 +164,7 @@ export const CourseContent = ({
               previewLoading={previewLoading}
               hasAccess={hasAccess}
               isLessonCompleted={isLessonCompleted}
+              courseCategory={courseCategory}
             />
           ))
         )}
@@ -228,6 +231,7 @@ const ModuleSection = ({
   previewLoading,
   hasAccess,
   isLessonCompleted,
+  courseCategory,
 }) => {
   return (
     <div className="border-b border-slate-200 dark:border-slate-800 last:border-b-0">
@@ -255,6 +259,7 @@ const ModuleSection = ({
           previewLoading={previewLoading}
           hasAccess={hasAccess}
           isLessonCompleted={isLessonCompleted}
+          courseCategory={courseCategory}
         />
       )}
     </div>
@@ -267,6 +272,7 @@ const ModuleLessons = ({
   previewLoading,
   hasAccess,
   isLessonCompleted,
+  courseCategory,
 }) => {
   return (
     <div className="bg-slate-50 dark:bg-slate-800/30 divide-y divide-slate-200 dark:divide-slate-800">
@@ -294,10 +300,13 @@ const ModuleLessons = ({
               {hasThumbnail && !isLocked && (
                 <div className="w-16 h-10 rounded-md overflow-hidden border border-slate-200 dark:border-slate-700">
                   <img
-                    src={lesson.video.thumbnailUrl}
+                    src={getCategoryImage(courseCategory || 'default')}
                     alt={`Thumbnail for ${lesson.title}`}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1524178232393-3dcfa7c3893d?w=400&h=300&fit=crop";
+                    }}
                   />
                 </div>
               )}

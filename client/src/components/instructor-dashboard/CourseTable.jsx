@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronRight, Plus } from "lucide-react";
+import { getCategoryImage } from "@/utils/categoryImages";
 
 const CourseTable = ({
   courses = [],
@@ -73,7 +74,7 @@ const CourseTable = ({
                 <TableRow key={course._id || course.id}>
                   <TableCell>
                     <img
-                      src={resolveThumbnail(course) || thumbnailPlaceholder}
+                      src={getCategoryImage(course?.category || 'default')}
                       alt={course.title || "Course"}
                       className="h-12 w-20 object-cover rounded-md border border-slate-200 dark:border-slate-700"
                       onError={(e) => {

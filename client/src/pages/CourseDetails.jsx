@@ -14,7 +14,6 @@ import { OverviewTab } from "../components/course details/OverviewTab";
 import { RatingsTab } from "../components/course details/RatingsTab";
 import { InstructorTab } from "../components/course details/InstructorTab";
 import { useAuth } from "../context/AuthContext";
-import RelatedCourses from "../components/course details/relatedCourses";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -211,6 +210,7 @@ export const CourseDetails = () => {
               QuizView={QuizView}
               courseId={courseId}
               studentId={studentId}
+              courseCategory={course.category}
             />
 
 
@@ -223,9 +223,6 @@ export const CourseDetails = () => {
                 studentId={studentId}
               />
             </div>
-            <div className="mt-12">
-    <RelatedCourses courseId={courseId} course={course}  />
-  </div>
           </TabsContent>
 
           <TabsContent value="overview">

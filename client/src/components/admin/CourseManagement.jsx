@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Eye, Users, BookOpen, DollarSign, X } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Eye, Users, BookOpen, DollarSign, X, Mail, Calendar, Award } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
@@ -29,6 +29,9 @@ const CourseManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [enrolledStudents, setEnrolledStudents] = useState([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [showStudentsModal, setShowStudentsModal] = useState(false);
 
   // Fetch courses
   useEffect(() => {
@@ -49,15 +52,61 @@ const CourseManagement = () => {
 
         console.log("🔍 Courses API Response:", response.data);
 
+        let coursesData = [];
         if (response.data?.courses) {
-          setCourses(response.data.courses);
+          coursesData = response.data.courses;
         } else if (response.data) {
-          setCourses(response.data);
+          coursesData = response.data;
         } else {
           console.log("❌ Invalid courses API response:", response.data);
           toast.error("Invalid API response format");
           setCourses([]);
+          return;
         }
+
+        // Fetch enrollment data for each course
+        const coursesWithEnrollment = await Promise.all(
+          coursesData.map(async (course) => {
+            let enrolledStudents = 0;
+            let students = [];
+            
+            // Use the working admin endpoint
+            try {
+              const enrollmentResponse = await axios.get(
+                `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses/${course._id}/students`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+              
+              console.log(`✅ Enrollment data from /api/admin/courses/${course._id}/students:`, enrollmentResponse.data);
+              
+              // Handle different response formats
+              if (Array.isArray(enrollmentResponse.data?.students)) {
+                students = enrollmentResponse.data.students;
+              } else if (Array.isArray(enrollmentResponse.data)) {
+                students = enrollmentResponse.data;
+              } else if (enrollmentResponse.data?.students) {
+                students = enrollmentResponse.data.students;
+              }
+              
+              enrolledStudents = students.length;
+              console.log(`📊 Course ${course.title}: ${enrolledStudents} students found`);
+            } catch (error) {
+              console.log(`❌ Failed to fetch enrollment for course ${course._id}:`, error.response?.status);
+              // Set 0 as fallback
+              enrolledStudents = 0;
+            }
+            
+            return {
+              ...course,
+              enrolledStudents: enrolledStudents,
+              students: students
+            };
+          })
+        );
+
+        setCourses(coursesWithEnrollment);
       } catch (error) {
         console.error("❌ Error fetching courses:", error);
         toast.error(`Failed to load courses: ${error.response?.data?.message || error.message}`);
@@ -105,6 +154,71 @@ const CourseManagement = () => {
     setSelectedCourse(null);
   };
 
+  const fetchEnrolledStudents = async (courseId) => {
+    setIsLoadingStudents(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      let students = [];
+      
+      // Use the working admin endpoint
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses/${courseId}/students`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        console.log(`🔍 Enrolled Students API Response:`, response.data);
+
+        // Handle different response formats
+        if (Array.isArray(response.data?.students)) {
+          students = response.data.students;
+        } else if (Array.isArray(response.data)) {
+          students = response.data;
+        } else if (response.data?.students) {
+          students = response.data.students;
+        }
+      } catch (error) {
+        console.log(`❌ Failed to fetch students for course ${courseId}:`, error.response?.status);
+        students = [];
+      }
+
+      console.log(`📊 Final student count: ${students.length}`);
+      setEnrolledStudents(students);
+    } catch (error) {
+      console.error("❌ Error fetching enrolled students:", error);
+      toast.error(`Failed to load students: ${error.response?.data?.message || error.message}`);
+      setEnrolledStudents([]);
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
+
+  const handleViewStudents = (course) => {
+    setSelectedCourse(course);
+    // Use pre-fetched students data if available, otherwise fetch fresh data
+    if (course.students && course.students.length > 0) {
+      setEnrolledStudents(course.students);
+      setShowStudentsModal(true);
+    } else {
+      // Fallback to fetching fresh data
+      setShowStudentsModal(true);
+      fetchEnrolledStudents(course._id);
+    }
+  };
+
+  const handleCloseStudentsModal = () => {
+    setShowStudentsModal(false);
+    setEnrolledStudents([]);
+    setSelectedCourse(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -116,7 +230,7 @@ const CourseManagement = () => {
   return (
     <div className="space-y-6">
       {/* Course Detail Modal */}
-      {selectedCourse && (
+      {selectedCourse && !showStudentsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
@@ -154,6 +268,112 @@ const CourseManagement = () => {
             
             <div className="flex justify-end space-x-3 mt-6">
               <Button variant="outline" onClick={handleCloseCourseDetail}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enrolled Students Modal */}
+      {showStudentsModal && selectedCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Enrolled Students</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {selectedCourse.title} ({enrolledStudents.length} students)
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleCloseStudentsModal}>
+                ×
+              </Button>
+            </div>
+            
+            {isLoadingStudents ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fidel-500 border-t-transparent"></div>
+              </div>
+            ) : enrolledStudents.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="mx-auto h-12 w-12 text-slate-400 mb-4" />
+                <p className="text-slate-600 dark:text-slate-400">
+                  No students enrolled in this course yet
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Enrollment Date</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {enrolledStudents.map((student, index) => (
+                    <TableRow key={student._id || index}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-fidel-100 dark:bg-fidel-900/30 flex items-center justify-center">
+                            <span className="text-xs font-medium text-fidel-600 dark:text-fidel-400">
+                              {student.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'ST'}
+                            </span>
+                          </div>
+                          {student.name || 'Unknown Student'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Mail size={14} className="text-slate-400" />
+                          <span className="text-sm">{student.email || 'N/A'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Calendar size={14} className="text-slate-400" />
+                          <span className="text-sm">
+                            {student.enrolledAt ? new Date(student.enrolledAt).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-24 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-fidel-500 rounded-full"
+                              style={{ width: `${student.progress || 0}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-slate-600 dark:text-slate-400">
+                            {student.progress || 0}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            student.progress === 100
+                              ? 'bg-green-100 text-green-800'
+                              : student.progress > 0
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {student.progress === 100 ? 'Completed' : student.progress > 0 ? 'In Progress' : 'Not Started'}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            
+            <div className="flex justify-end mt-6">
+              <Button variant="outline" onClick={handleCloseStudentsModal}>
                 Close
               </Button>
             </div>
@@ -237,7 +457,9 @@ const CourseManagement = () => {
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Users size={16} className="text-slate-400" />
-                        {course.enrolledStudents || 0}
+                        <span className="cursor-pointer hover:text-fidel-600" onClick={() => handleViewStudents(course)}>
+                          {course.enrolledStudents || 0}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>

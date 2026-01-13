@@ -7,6 +7,8 @@ import { useAuth } from "../../context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
+import { AchievementsModal } from "./AchievementsModal";
+import { getCategoryImage } from "@/utils/categoryImages";
 
 // Create axios instance with auth headers
 const api = axios.create({
@@ -37,6 +39,7 @@ export const CoursesTab = () => {
   const [progressMap, setProgressMap] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [showAchievements, setShowAchievements] = useState(false);
   const navigate = useNavigate();
 
   const coursePlaceholder =
@@ -248,7 +251,7 @@ export const CoursesTab = () => {
               </p>
             )}
 
-            <Button className="w-full" variant="outline">
+            <Button className="w-full" variant="outline" onClick={() => setShowAchievements(true)}>
               View All Achievements
             </Button>
           </div>
@@ -294,7 +297,7 @@ export const CoursesTab = () => {
                       (acc, module) => acc + (module.lessons?.length || 0),
                       0
                     ) || 0;
-                  const completedLessons =
+                  const completedLessonsCount =
                     progress?.completedLessons?.length || 0;
 
                   return (
@@ -307,11 +310,7 @@ export const CoursesTab = () => {
                     >
                       <div className="h-40 bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
                         <img
-                          src={
-                            (typeof course.thumbnail === 'string'
-                              ? course.thumbnail
-                              : course.thumbnail?.url) || coursePlaceholder
-                          }
+                          src={getCategoryImage(course.category || 'default')}
                           alt={course.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
@@ -337,7 +336,7 @@ export const CoursesTab = () => {
                           <div className="flex justify-between text-sm mb-1 text-slate-600 dark:text-slate-300">
                             <span>{Math.round(percentage)}% complete</span>
                             <span>
-                              {completedLessons}/{total} lessons
+                              {completedLessonsCount}/{totalLessons} lessons
                             </span>
                           </div>
                           <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -374,6 +373,15 @@ export const CoursesTab = () => {
           </section>
         </div>
       </div>
+
+      {/* Achievements Modal */}
+      <AchievementsModal
+        isOpen={showAchievements}
+        onClose={() => setShowAchievements(false)}
+        user={user}
+        courses={courses}
+        progressMap={progressMap}
+      />
     </div>
   );
 };

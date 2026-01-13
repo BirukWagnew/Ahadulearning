@@ -11,14 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
 
 const PlatformSettings = () => {
   const { refreshUser } = useAuth();
   const [user, setUser] = useState({
-    profilePic: "",
     name: "",
     email: "",
     bio: "",
@@ -31,12 +29,9 @@ const PlatformSettings = () => {
     newPassword: "",
     confirmPassword: "",
   });
-  const [avatarPreview, setAvatarPreview] = useState(user.profilePic);
   const [isLoading, setIsLoading] = useState(false);
-  const [isAvatarLoading, setIsAvatarLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
+  const fetchUserData = async () => {
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Please log in to view your profile");
@@ -55,7 +50,7 @@ const PlatformSettings = () => {
         });
   
         const userData = response.data;
-        console.log("API Response:", userData);
+        console.log("Fresh user data fetched:", userData);
         setUser(userData);
         setFormData((prev) => ({
           ...prev,
@@ -63,73 +58,20 @@ const PlatformSettings = () => {
           email: userData.email || "",
           bio: userData.bio || "",
         }));
-        const raw = userData.profilePic;
-        const fullProfilePicUrl =
-          raw && typeof raw === "string"
-            ? raw.startsWith("http")
-              ? raw
-              : `${API_BASE_URL}${raw}`
-            : "/avatars/default-avatar.jpg";
-  
-      
-         
-        console.log("Profile Pic URL:", fullProfilePicUrl);
-        setAvatarPreview(fullProfilePicUrl);
-        console.log("Avatar Preview Set To:", fullProfilePicUrl);
       }  catch (error) {
         console.error("API Error:", error.response?.data || error.message);
-        
-
         toast.error(error.response?.data?.message || error.message || "Failed to fetch user data");
       } finally {
         setIsLoading(false);
       }
     };
-  
+
+  useEffect(() => {
     fetchUserData();
   }, []);
-  // Get initials from name
-  const getInitials = (name) => {
-    if (!name) return "";
-    const names = name.split(" ");
-    let initials = names[0].substring(0, 1).toUpperCase();
-    if (names.length > 1) {
-      initials += names[names.length - 1].substring(0, 1).toUpperCase();
-    }
-    return initials;
-  };
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!file.type.match("image.*")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) { // 2MB limit
-      toast.error("File size should be less than 2MB");
-      return;
-    }
-
-    setIsAvatarLoading(true);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAvatarPreview(reader.result);
-      setIsAvatarLoading(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveAvatar = () => {
-    setAvatarPreview("");
   };
 
   const handleProfileUpdate = async (e) => {
@@ -138,48 +80,75 @@ const PlatformSettings = () => {
 
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-    const formDataToSend = new FormData();
-    formDataToSend.append("name", formData.name);
-    formDataToSend.append("email", formData.email);
-    formDataToSend.append("bio", formData.bio);
-
-    if (avatarPreview && avatarPreview !== user.profilePic) {
-      // Convert data URL to Blob for file upload
-      const blob = await (await fetch(avatarPreview)).blob();
-      formDataToSend.append("profilePic", blob, "avatar.jpg");
-      console.log("User profile pic:", user.profilePic);
-
-    }
-
     try {
+      console.log("Sending profile update request...");
+      console.log("Form data being sent:", {
+        name: formData.name,
+        email: formData.email,
+        bio: formData.bio
+      });
+
       const response = await axios.put(
         `${API_BASE_URL}/api/users/profile`,
-        formDataToSend,
+        {
+          name: formData.name,
+          email: formData.email,
+          bio: formData.bio
+        },
         {
           headers: {
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
 
+      console.log("Profile update response:", response);
+      console.log("Response data:", response.data);
+
       setIsLoading(false);
       toast.success("Profile updated successfully!");
 
-      // Refresh global auth user so Navbar/avatar updates immediately
-      await refreshUser();
+      // Refresh global auth user so Navbar updates immediately
+      try {
+        console.log("Refreshing global user context...");
+        await refreshUser();
+        console.log("Global user context refreshed");
+      } catch (refreshError) {
+        console.error("Failed to refresh global user:", refreshError);
+        // Continue with local state update even if global refresh fails
+      }
 
-      // Re-sync local page state from response (handles new profilePic path)
+      // Re-sync local page state from response
       if (response?.data?.user) {
-        setUser(response.data.user);
-        const raw = response.data.user.profilePic;
-        const fullProfilePicUrl =
-          raw && typeof raw === "string"
-            ? raw.startsWith("http")
-              ? raw
-              : `${API_BASE_URL}${raw}`
-            : "";
-        if (fullProfilePicUrl) setAvatarPreview(fullProfilePicUrl);
+        console.log("Updating local state from response.data.user");
+        const updatedUser = response.data.user;
+        setUser(updatedUser);
+        
+        // Update form data with new values
+        setFormData((prev) => ({
+          ...prev,
+          name: updatedUser.name || "",
+          email: updatedUser.email || "",
+          bio: updatedUser.bio || "",
+        }));
+      } else if (response?.data) {
+        console.log("Updating local state from response.data");
+        // Handle alternative response structure
+        const updatedUser = response.data;
+        setUser(updatedUser);
+        
+        setFormData((prev) => ({
+          ...prev,
+          name: updatedUser.name || prev.name,
+          email: updatedUser.email || prev.email,
+          bio: updatedUser.bio || prev.bio,
+        }));
+      } else {
+        console.warn("Unexpected response structure:", response);
+        // If response structure is unexpected, try to refresh user data
+        console.log("Attempting to fetch fresh user data...");
+        fetchUserData();
       }
     } catch (error) {
       setIsLoading(false);
@@ -235,57 +204,7 @@ const PlatformSettings = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center">
-              <div className="relative mb-4">
-                <Avatar className="w-32 h-32">
-                  {avatarPreview ? (
-                    <AvatarImage src={avatarPreview} alt="Profile picture" />
-                  ) : (
-                    <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                      {getInitials(formData?.name || user?.name || "User")}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                {isAvatarLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                  </div>
-                )}
-              </div>
-
-              <div className="w-full space-y-2">
-                <input
-                  type="file"
-                  id="avatar-upload"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="avatar-upload"
-                  className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-10 py-2 px-4 cursor-pointer"
-                >
-                  {avatarPreview ? "Change Avatar" : "Upload Avatar"}
-                </label>
-
-                {avatarPreview && (
-                  <Button
-                    variant="outline"
-                    onClick={handleRemoveAvatar}
-                    className="w-full"
-                    disabled={isAvatarLoading}
-                  >
-                    Remove Avatar
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="md:col-span-2">
+        <div className="md:col-span-3">
           <Tabs defaultValue="account" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="account">Account Info</TabsTrigger>
@@ -339,10 +258,20 @@ const PlatformSettings = () => {
 
                       <Button
                         type="submit"
-                        disabled={isLoading || isAvatarLoading}
+                        disabled={isLoading}
                         className="w-full"
                       >
                         {isLoading ? "Updating..." : "Save Changes"}
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={fetchUserData}
+                        disabled={isLoading}
+                        className="w-full mt-2"
+                      >
+                        Refresh Profile Data
                       </Button>
                     </div>
                   </form>

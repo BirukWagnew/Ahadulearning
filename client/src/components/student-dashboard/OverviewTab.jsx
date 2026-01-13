@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
+import { CourseRecommendations } from "./CourseRecommendations";
 
 export const OverviewTab = () => {
   const { user } = useAuth();
@@ -346,6 +347,9 @@ export const OverviewTab = () => {
           )}
         </div>
       </section>
+
+      {/* Course Recommendations */}
+      <CourseRecommendations />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { useState, useRef, createContext, useContext } from "react";
 import axios from "axios";
+import { getCategoryImage } from "@/utils/categoryImages";
 import {
   Book,
   UploadCloud,
@@ -356,7 +357,7 @@ const LessonEditor = ({
                 <div className="flex items-start">
                   <div className="relative w-40 h-24 rounded overflow-hidden mr-4">
                     <img
-                      src={assignedVideo.thumbnail}
+                      src={getCategoryImage(courseData.category || 'default')}
                       alt={assignedVideo.name}
                       className="w-full h-full object-cover"
                     />

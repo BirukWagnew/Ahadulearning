@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useState, useEffect } from "react";
+import { getCategoryImage } from "@/utils/categoryImages";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -234,9 +235,12 @@ export const CourseHeader = ({
             <div className="md:w-96">
               <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-xl">
                 <img
-                  src={course?.thumbnail?.url || course?.thumbnail || ""}
+                  src={getCategoryImage(course?.category || 'default')}
                   alt={course.title}
                   className="w-full h-52 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1524178232393-3dcfa7c3893d?w=400&h=300&fit=crop";
+                  }}
                 />
 
                 <div className="p-6">

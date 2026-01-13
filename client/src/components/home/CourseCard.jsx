@@ -4,6 +4,7 @@ import { Clock, Users, Star, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import PropTypes from "prop-types";
+import { getCategoryImage } from "@/utils/categoryImages";
 
 const CourseCard = ({
   id,
@@ -48,11 +49,12 @@ const CourseCard = ({
   const instructorName = instructor?.name || "Unknown Instructor";
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const rawImageUrl = typeof thumbnail === "string" ? thumbnail : thumbnail?.url;
-  const imageUrl = rawImageUrl
-    ? rawImageUrl.startsWith("http")
-      ? rawImageUrl
-      : `${API_BASE_URL}${rawImageUrl}`
-    : "";
+  
+  // ALWAYS use category image from shared utility, ignore instructor images
+  const imageUrl = getCategoryImage(category);
+  
+  // Debug: Log the final image URL being used
+  console.log('Final image URL for category', category, ':', imageUrl);
 
   const categoryName = category.split('-').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1)

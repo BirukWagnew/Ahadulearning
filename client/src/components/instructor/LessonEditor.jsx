@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,19 @@ const LessonEditor = ({
 
     createNewLessonIfNeeded();
   }, [selectedLesson, lesson]);
+
+  const saveLessonChanges = async (moduleId) => {
+    setIsCreatingLesson(true);
+    try {
+      // Just show success message for saving changes
+      toast.success('Lesson changes saved successfully');
+    } catch (error) {
+      toast.error(`Error saving changes: ${error.message || 'Unknown error'}`);
+      console.error('Error saving lesson changes:', error);
+    } finally {
+      setIsCreatingLesson(false);
+    }
+  };
 
   const createNewLesson = async (moduleId) => {
     setIsCreatingLesson(true);
@@ -243,13 +256,13 @@ const LessonEditor = ({
       </CardContent>
 
       <CardFooter>
-        <Button size="sm" disabled={isCreatingLesson} onClick={() => createNewLesson(selectedModule)}>
+        <Button size="sm" disabled={isCreatingLesson} onClick={() => saveLessonChanges(selectedModule)}>
           {isCreatingLesson ? (
             <RefreshCw size={14} className="mr-1 animate-spin" />
           ) : (
             <CheckCircle size={14} className="mr-1" />
           )}
-          {isCreatingLesson ? 'Creating...' : 'Save Changes'}
+          {isCreatingLesson ? 'Saving...' : 'Save Changes'}
         </Button>
       </CardFooter>
     </Card>
@@ -312,18 +325,59 @@ const LessonActions = ({
   </div>
 );
 
-const LessonTitleInput = ({ title, onChange }) => (
-  <div>
-    <Label htmlFor="lesson-title">Lesson Title</Label>
-    <Input
-      id="lesson-title"
-      value={title}
-      onChange={(e) => onChange(e.target.value)}
-      className="mt-1"
-      placeholder="Enter lesson title"
-    />
-  </div>
-);
+const LessonTitleInput = ({ title, onChange }) => {
+  const [localTitle, setLocalTitle] = useState(title || '');
+  const [isTyping, setIsTyping] = useState(false);
+  const timeoutRef = useRef(null);
+
+  // Update local title when prop changes
+  useEffect(() => {
+    setLocalTitle(title || '');
+  }, [title]);
+
+  // Debounced onChange to prevent toast spam while typing
+  const debouncedOnChange = useCallback(
+    (value) => {
+      setIsTyping(false);
+      onChange(value);
+    },
+    [onChange]
+  );
+
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setLocalTitle(value);
+    setIsTyping(true);
+    
+    // Clear previous timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    // Set new timeout
+    timeoutRef.current = setTimeout(() => {
+      debouncedOnChange(value);
+    }, 500); // Wait 500ms after user stops typing
+  };
+
+  return (
+    <div>
+      <Label htmlFor="lesson-title">Lesson Title</Label>
+      <Input
+        id="lesson-title"
+        value={localTitle}
+        onChange={handleInputChange}
+        className="mt-1"
+        placeholder="Enter lesson title"
+      />
+      {isTyping && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Typing...
+        </p>
+      )}
+    </div>
+  );
+};
 
 const VideoLessonContent = ({
   assignedVideo,

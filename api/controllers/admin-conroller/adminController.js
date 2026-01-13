@@ -5,6 +5,7 @@ import Course from '../../models/Course.js';
 import { deleteFromCloudinary } from '../../services/cloudStorage.js';
 import Payment from '../../models/Payment.js';
 import Withdrawal from '../../models/Withdrawal.js';
+import Enrollment from '../../models/Enrollment.js';
 
 export const approveInstructor = async (req, res) => {
     const { userId } = req.params;
@@ -545,5 +546,43 @@ export const generatePaymentReport = async (req, res) => {
   } catch (error) {
     console.error("Error generating payment report:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get students enrolled in a specific course
+export const getCourseStudents = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+
+    // Find all enrollments for this course and populate student data
+    const enrollments = await Enrollment.find({ courseId })
+      .populate('studentId', 'name email')
+      .sort({ enrolledAt: -1 });
+
+    // Transform the data to match expected format
+    const students = enrollments.map(enrollment => ({
+      _id: enrollment.studentId._id,
+      name: enrollment.studentId.name,
+      email: enrollment.studentId.email,
+      enrolledAt: enrollment.enrolledAt,
+      progress: enrollment.progress || 0,
+      status: enrollment.status || 'active'
+    }));
+
+    res.status(200).json({
+      success: true,
+      students: students,
+      count: students.length
+    });
+  } catch (error) {
+    console.error('Error fetching course students:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch course students', 
+      error: error.message 
+    });
   }
 };

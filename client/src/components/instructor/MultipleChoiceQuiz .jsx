@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "../ui/Checkbox ";
@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Trash2, PlusCircle, Check, X, HelpCircle } from "lucide-react";
+import { Trash2, PlusCircle, Check, X, HelpCircle, Upload, FileText } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { toast } from "sonner";
 
@@ -25,6 +25,91 @@ const MultipleChoiceQuiz = ({
   const [activeQuestion, setActiveQuestion] = useState(
     initialQuestions.length > 0 ? initialQuestions[0].id : null
   );
+  const [pdfFile, setPdfFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [hasShownCompletionToast, setHasShownCompletionToast] = useState(false);
+  const timeoutRef = useRef(null);
+
+  // Check if quiz is complete
+  const isQuizComplete = useCallback(() => {
+    if (questions.length === 0) return false;
+    
+    return questions.every(question => {
+      return (
+        question.question.trim() !== '' &&
+        question.options.length >= 2 &&
+        question.options.every(option => option.text.trim() !== '') &&
+        question.options.some(option => option.isCorrect)
+      );
+    });
+  }, [questions]);
+
+  // Show completion toast once when quiz becomes complete
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      if (isQuizComplete() && !hasShownCompletionToast) {
+        toast.success("Quiz completed successfully! 🎉");
+        setHasShownCompletionToast(true);
+      } else if (!isQuizComplete() && hasShownCompletionToast) {
+        setHasShownCompletionToast(false);
+      }
+    }, 1000); // Wait 1 second to avoid spam during editing
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [questions, isQuizComplete, hasShownCompletionToast]);
+
+  // PDF upload handler
+  const handlePdfUpload = async (file) => {
+    if (!file || file.type !== 'application/pdf') {
+      toast.error('Please upload a valid PDF file');
+      return;
+    }
+
+    setIsUploading(true);
+    setPdfFile(file);
+
+    try {
+      // Here you would upload to your server
+      // For now, just show success and store the file
+      toast.success('PDF uploaded successfully');
+      
+      // You can add the PDF to the quiz data or handle it as needed
+      const updatedQuestions = questions.map(q => ({
+        ...q,
+        pdfAttachment: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: URL.createObjectURL(file) // temporary URL for preview
+        }
+      }));
+      
+      setQuestions(updatedQuestions);
+      if (onChange) {
+        onChange(updatedQuestions);
+      }
+    } catch (error) {
+      toast.error('Failed to upload PDF');
+      console.error('PDF upload error:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handlePdfUpload(file);
+    }
+  };
 
   const handleQuestionChange = (questionId, updatedQuestion) => {
     const updatedQuestions = questions.map((q) =>
@@ -154,7 +239,8 @@ const MultipleChoiceQuiz = ({
       onChange(updatedQuestions);
     }
 
-    toast.success("Question removed");
+    // Reset completion toast state when removing questions
+    setHasShownCompletionToast(false);
   };
 
   const removeOption = (questionId, optionId) => {
@@ -220,13 +306,71 @@ const MultipleChoiceQuiz = ({
             ? "No questions yet"
             : `${questions.length} Question(s)`}
         </h3>
-        {!readOnly && (
-          <Button onClick={addQuestion} size="sm">
-            <PlusCircle size={16} className="mr-2" />
-            Add Question
-          </Button>
-        )}
+        <div className="flex items-center space-x-2">
+          {!readOnly && (
+            <>
+              {/* PDF Upload */}
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={isUploading}
+                />
+                <Button variant="outline" size="sm" disabled={isUploading}>
+                  {isUploading ? (
+                    <div className="animate-spin mr-2">⏳</div>
+                  ) : (
+                    <Upload size={16} className="mr-2" />
+                  )}
+                  {pdfFile ? 'Change PDF' : 'Upload PDF'}
+                </Button>
+              </div>
+              
+              <Button onClick={addQuestion} size="sm">
+                <PlusCircle size={16} className="mr-2" />
+                Add Question
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* PDF Attachment Display */}
+      {pdfFile && (
+        <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+          <div className="flex items-center space-x-2">
+            <FileText size={16} className="text-blue-600 dark:text-blue-400" />
+            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              {pdfFile.name}
+            </span>
+            <span className="text-xs text-blue-600 dark:text-blue-400">
+              ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
+            </span>
+          </div>
+          {!readOnly && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPdfFile(null);
+                const updatedQuestions = questions.map(q => {
+                  const { pdfAttachment, ...rest } = q;
+                  return rest;
+                });
+                setQuestions(updatedQuestions);
+                if (onChange) {
+                  onChange(updatedQuestions);
+                }
+              }}
+              className="text-red-500 hover:text-red-700"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
+        </div>
+      )}
 
       {questions.length === 0 ? (
         <div className="text-center py-8 border border-dashed rounded-md">

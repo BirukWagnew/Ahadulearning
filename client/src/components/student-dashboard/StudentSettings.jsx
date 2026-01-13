@@ -14,13 +14,28 @@ export const StudentSettings = () => {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    // Load user preferences
+    // Load user preferences and sync with current theme
     if (user) {
-      setDarkMode(localStorage.getItem('darkMode') === 'true');
+      const currentTheme = localStorage.getItem('theme') || 'light';
+      setDarkMode(currentTheme === 'dark');
       setNotifications(localStorage.getItem('notifications') !== 'false');
       setEmailNotifications(localStorage.getItem('emailNotifications') !== 'false');
     }
   }, [user]);
+
+  const handleDarkModeToggle = (newValue) => {
+    setDarkMode(newValue);
+    
+    // Immediately apply theme change
+    const root = document.documentElement;
+    if (newValue) {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const handleSaveSettings = async () => {
     setIsLoading(true);
@@ -91,7 +106,7 @@ export const StudentSettings = () => {
           label: "Dark Mode",
           type: "toggle",
           value: darkMode,
-          onChange: setDarkMode,
+          onChange: handleDarkModeToggle,
           description: "Use dark theme across the platform",
         },
       ],

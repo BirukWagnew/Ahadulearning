@@ -17,6 +17,7 @@ import {
   approveWithdrawal,
   rejectWithdrawal,
   generatePaymentReport,
+  getCourseStudents,
 } from "../../controllers/admin-conroller/adminController.js";
 import { adminAuth, protect } from "../../middleware/authMiddleware.js";
 import { 
@@ -46,6 +47,7 @@ router.post("/:id", getUserById); // Changed from GET to POST
 
 router.get('/courses', adminAuth, getAllCoursesAdmin);
 router.delete('/courses/:id', adminAuth, deleteCourseAdmin);
+router.get('/courses/:courseId/students', adminAuth, getCourseStudents);
 
 // Payment management routes
 router.get('/payments', adminAuth, getPaymentTransactions);
