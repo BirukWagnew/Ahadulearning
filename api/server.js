@@ -111,7 +111,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(morgan("dev"));
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
@@ -140,7 +144,17 @@ app.get("/download/:filename", (req, res) => {
 });
 
 
-app.use('/uploads', cors(), express.static('uploads'));
+app.use(
+  "/uploads",
+  cors({ origin: process.env.FRONTEND_URL, credentials: true }),
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "*");
+    res.setHeader("Vary", "Origin");
+    next();
+  },
+  express.static("uploads")
+);
 
 
 app.use('/api/auth', authRoutes);
@@ -165,7 +179,7 @@ app.use(
 
 app.use("/api/certificates", certificateRoutes);
 
-app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
+// NOTE: /uploads is already handled above with CORS + CORP headers
 app.use("/api/chat", chatRoutes);
 
 // Root route

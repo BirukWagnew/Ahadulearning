@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,16 @@ const CurriculumManager = ({
 }) => {
   const { courseId, setModuleId, setLessonId } = useCourse();
   const moduleFileInputRef = useRef(null);
+  const quizSaveTimeoutRef = useRef(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (quizSaveTimeoutRef.current) {
+        clearTimeout(quizSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const addModule = async () => {
     if (!courseId) {
@@ -360,81 +370,92 @@ const CurriculumManager = ({
                 quizQuestions={currentQuizQuestions}
                 onQuizQuestionsChange={(questions) => {
                   setCurrentQuizQuestions(questions);
+                  
+                  // Clear existing timeout
+                  if (quizSaveTimeoutRef.current) {
+                    clearTimeout(quizSaveTimeoutRef.current);
+                  }
+                  
+                  // Only save if user has stopped typing for 2 seconds and there's a selected lesson
                   if (selectedLesson) {
-                    console.log("Saving quiz questions for lesson:", selectedLesson);
-                    console.log("Questions to save:", questions);
-                    
-                    // Validate questions before saving
-                    const validQuestions = questions.filter(q => {
-                      // Check if question has text
-                      if (!q.question || q.question.trim() === '') {
-                        return false;
-                      }
-                      // Check if at least 2 options have text
-                      const validOptions = q.options.filter(opt => opt.text && opt.text.trim() !== '');
-                      if (validOptions.length < 2) {
-                        return false;
-                      }
-                      // Check if at least one option is marked as correct
-                      const hasCorrectAnswer = q.options.some(opt => opt.isCorrect);
-                      if (!hasCorrectAnswer) {
-                        return false;
-                      }
-                      return true;
-                    });
-                    
-                    if (validQuestions.length === 0) {
-                      toast.error("Please add at least one complete question with text, at least 2 options, and a correct answer");
-                      return;
-                    }
-                    
-                    if (validQuestions.length < questions.length) {
-                      toast.warning("Only complete questions will be saved. Make sure all questions have text, at least 2 options, and a correct answer.");
-                    }
-                    
-                    // First, ensure the lesson is set as quiz type
-                    api.put(`/lessons/${selectedLesson}`, {
-                      type: "quiz"
-                    }).then(() => {
-                      console.log("Lesson type set to quiz");
+                    quizSaveTimeoutRef.current = setTimeout(() => {
+                      console.log("Saving quiz questions for lesson:", selectedLesson);
+                      console.log("Questions to save:", questions);
                       
-                      // Save each valid quiz question individually
-                      const savePromises = validQuestions.map((q) => 
-                        api.post(`/lessons/${selectedLesson}/questions`, {
-                          question: q.question,
-                          options: q.options.map((opt) => ({
-                            text: opt.text,
-                            isCorrect: opt.isCorrect,
-                          })),
-                          type: q.type || "single",
-                          points: q.points || 1,
-                        }, {
-                          headers: { "Content-Type": "application/json" },
-                        })
-                      );
+                      // Validate questions before saving
+                      const validQuestions = questions.filter(q => {
+                        // Check if question has text
+                        if (!q.question || q.question.trim() === '') {
+                          return false;
+                        }
+                        // Check if at least 2 options have text
+                        const validOptions = q.options.filter(opt => opt.text && opt.text.trim() !== '');
+                        if (validOptions.length < 2) {
+                          return false;
+                        }
+                        // Check if at least one option is marked as correct
+                        const hasCorrectAnswer = q.options.some(opt => opt.isCorrect);
+                        if (!hasCorrectAnswer) {
+                          return false;
+                        }
+                        return true;
+                      });
                       
-                      return Promise.all(savePromises);
-                    }).then((results) => {
-                      console.log("Quiz questions saved successfully:", results);
-                      setModules((prevModules) =>
-                        prevModules.map((module) =>
-                          module.lessons?.some((lesson) => lesson._id === selectedLesson)
-                            ? {
-                                ...module,
-                                lessons: module.lessons.map((lesson) =>
-                                  lesson._id === selectedLesson
-                                    ? { ...lesson, quizQuestions: validQuestions, type: "quiz" }
-                                    : lesson
-                                ),
-                              }
-                            : module
-                        )
-                      );
-                      toast.success(`${validQuestions.length} quiz question(s) saved successfully`);
-                    }).catch((error) => {
-                      console.error("Quiz questions save error:", error);
-                      toast.error(error.response?.data?.message || "Failed to save quiz questions");
-                    });
+                      if (validQuestions.length === 0) {
+                        // Don't show toast for empty questions while typing
+                        console.log("No valid questions to save yet");
+                        return;
+                      }
+                      
+                      if (validQuestions.length < questions.length) {
+                        console.log("Only complete questions will be saved");
+                      }
+                      
+                      // First, ensure the lesson is set as quiz type
+                      api.put(`/lessons/${selectedLesson}`, {
+                        type: "quiz"
+                      }).then(() => {
+                        console.log("Lesson type set to quiz");
+                        
+                        // Save each valid quiz question individually
+                        const savePromises = validQuestions.map((q) => 
+                          api.post(`/lessons/${selectedLesson}/questions`, {
+                            question: q.question,
+                            options: q.options.map((opt) => ({
+                              text: opt.text,
+                              isCorrect: opt.isCorrect,
+                            })),
+                            type: q.type || "single",
+                            points: q.points || 1,
+                          }, {
+                            headers: { "Content-Type": "application/json" },
+                          })
+                        );
+                        
+                        return Promise.all(savePromises);
+                      }).then((results) => {
+                        console.log("Quiz questions saved successfully:", results);
+                        setModules((prevModules) =>
+                          prevModules.map((module) =>
+                            module.lessons?.some((lesson) => lesson._id === selectedLesson)
+                              ? {
+                                  ...module,
+                                  lessons: module.lessons.map((lesson) =>
+                                    lesson._id === selectedLesson
+                                      ? { ...lesson, quizQuestions: validQuestions, type: "quiz" }
+                                      : lesson
+                                  ),
+                                }
+                              : module
+                          )
+                        );
+                        // Only show toast when questions are actually saved (not on every keystroke)
+                        toast.success(`${validQuestions.length} quiz question(s) saved successfully`);
+                      }).catch((error) => {
+                        console.error("Error saving quiz questions:", error);
+                        toast.error(error.response?.data?.message || "Failed to save quiz questions");
+                      });
+                    }, 2000); // Wait 2 seconds after user stops typing
                   }
                 }}
                 onReplaceLessonClick={(moduleId, lessonId) => {

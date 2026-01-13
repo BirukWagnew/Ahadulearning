@@ -108,11 +108,13 @@ const PaymentManagement = () => {
     const studentName = transaction.studentId?.name || '';
     const courseTitle = transaction.courseId?.title || '';
     const transactionId = transaction._id || transaction.tx_ref || '';
+    const instructorName = transaction.courseId?.instructor?.name || 'N/A';
     
     return (
       studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       courseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transactionId.toLowerCase().includes(searchQuery.toLowerCase())
+      transactionId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      instructorName.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
   
@@ -287,12 +289,13 @@ const PaymentManagement = () => {
   
   const getStatusBadge = (status) => {
     switch (status) {
+      case "success":
       case "completed":
       case "approved":
         return (
           <span className="flex items-center text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
             <Check size={12} className="mr-1" />
-            {status === "completed" ? "Completed" : "Approved"}
+            Paid
           </span>
         );
       case "failed":
@@ -300,14 +303,7 @@ const PaymentManagement = () => {
         return (
           <span className="flex items-center text-xs px-2 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
             <X size={12} className="mr-1" />
-            {status === "failed" ? "Failed" : "Rejected"}
-          </span>
-        );
-      case "refunded":
-        return (
-          <span className="flex items-center text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-            <Check size={12} className="mr-1" />
-            Refunded
+            Failed
           </span>
         );
       case "pending":
@@ -318,7 +314,12 @@ const PaymentManagement = () => {
           </span>
         );
       default:
-        return null;
+        return (
+          <span className="flex items-center text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">
+            <AlertCircle size={12} className="mr-1" />
+            {status || 'Unknown'}
+          </span>
+        );
     }
   };
 
@@ -350,7 +351,7 @@ const PaymentManagement = () => {
               <Button variant="outline" size="icon">
                 <FileDown size={16} />
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleGenerateReport}>
                 <FileText size={16} className="mr-2" />
                 Generate Report
               </Button>
@@ -391,7 +392,7 @@ const PaymentManagement = () => {
                         <TableCell>{transaction.studentId?.name || 'N/A'}</TableCell>
                         <TableCell>{transaction.courseId?.title || 'N/A'}</TableCell>
                         <TableCell className="font-mono">${transaction.amount?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell>{transaction.instructorId?.name || 'N/A'}</TableCell>
+                        <TableCell>{transaction.courseId?.instructor?.name || 'N/A'}</TableCell>
                         <TableCell>{getStatusBadge(transaction.status)}</TableCell>
                       </TableRow>
                     ))}

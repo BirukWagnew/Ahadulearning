@@ -4,6 +4,7 @@ import { Loader2, Calendar, Clock, BookOpen, Play } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { resolveMediaUrl } from "@/lib/media";
 
 // Create axios instance with auth headers
 const api = axios.create({
@@ -34,6 +35,8 @@ export const ScheduleTab = () => {
   const [courses, setCourses] = useState([]);
   const [progressMap, setProgressMap] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
   // Fetch enrolled courses
   useEffect(() => {
@@ -274,15 +277,27 @@ export const ScheduleTab = () => {
                   </div>
 
                   {/* Course Thumbnail */}
-                  {course.thumbnail?.url && (
-                    <div className="ml-6">
-                      <img
-                        src={course.thumbnail.url}
-                        alt={course.title}
-                        className="w-24 h-24 object-cover rounded-lg"
-                      />
-                    </div>
-                  )}
+                  {(() => {
+                    const raw =
+                      typeof course.thumbnail === "string"
+                        ? course.thumbnail
+                        : course.thumbnail?.url;
+                    if (!raw) return null;
+                    const src = resolveMediaUrl(raw, API_BASE_URL);
+                    if (!src) return null;
+                    return (
+                      <div className="ml-6">
+                        <img
+                          src={src}
+                          alt={course.title}
+                          className="w-24 h-24 object-cover rounded-lg"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             );

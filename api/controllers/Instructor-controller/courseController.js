@@ -19,6 +19,11 @@ function containsBannedContent(text) {
 
 export const checkImageForNSFW = async (imageUrl) => {
   try {
+    // If Sightengine credentials are not configured, skip the check.
+    if (!process.env.SIGHTENGINE_USER || !process.env.SIGHTENGINE_SECRET) {
+      return { isInappropriate: false, details: null };
+    }
+
     const response = await axios.get('https://api.sightengine.com/1.0/check.json', {
       params: {
         models: 'nudity,wad',
@@ -26,6 +31,7 @@ export const checkImageForNSFW = async (imageUrl) => {
         api_user: process.env.SIGHTENGINE_USER,
         api_secret: process.env.SIGHTENGINE_SECRET,
       },
+      timeout: 8000,
     });
 
     const { nudity, weapon, alcohol, drugs } = response.data;
@@ -166,11 +172,70 @@ export const getCourses = asyncHandler(async (req, res) => {
       path: 'modules',
       populate: {
         path: 'lessons',
-        select: 'title type duration free'
+        select: 'title type duration free position video quizQuestions'
       }
-    });
-  
-  res.json(courses);
+    })
+    .lean(); // Use lean for better performance
+
+  // Add enrollment counts, status, and other stats for each course
+  const coursesWithStats = await Promise.all(
+    courses.map(async (course) => {
+      try {
+        // Get enrollment count
+        const enrolledStudents = await Enrollment.countDocuments({ courseId: course._id });
+        
+        // Get total lessons count
+        const totalLessons = course.modules?.reduce((total, module) => 
+          total + (module.lessons?.length || 0), 0
+        ) || 0;
+        
+        // Get course status (default to active if not specified)
+        const courseStatus = course.status || 'active';
+        
+        // Get average progress for this course
+        let averageProgress = 0;
+        try {
+          const progressStats = await Enrollment.aggregate([
+            { $match: { courseId: course._id } },
+            { $group: null },
+            { 
+              $group: {
+                _id: null,
+                avgProgress: { $avg: '$progressPercentage' }
+              }
+            }
+          ]);
+          averageProgress = progressStats[0]?.avgProgress || 0;
+        } catch (error) {
+          console.error('Error fetching course progress:', error);
+          averageProgress = 0;
+        }
+        
+        return {
+          ...course.toObject(),
+          enrolledStudents,
+          totalLessons,
+          averageProgress,
+          status: courseStatus,
+          createdAt: course.createdAt,
+          updatedAt: course.updatedAt
+        };
+      } catch (error) {
+        console.error('Error fetching course stats:', error);
+        return {
+          ...course.toObject(),
+          enrolledStudents: 0,
+          totalLessons: 0,
+          averageProgress: 0,
+          status: course.status || 'active',
+          createdAt: course.createdAt,
+          updatedAt: course.updatedAt
+        };
+      }
+    })
+  );
+
+  res.json(coursesWithStats);
 });
 
  
@@ -199,6 +264,11 @@ export const getInstructorCourses = async (req, res) => {
 
  
 export const getCourseById = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    res.status(400);
+    throw new Error('Invalid course ID');
+  }
+
   const course = await Course.findById(req.params.id)
     .populate('instructor', 'name email')
     .populate({
@@ -536,9 +606,26 @@ export const getActiveCourses = async (req, res) => {
   try {
     const courses = await Course.find({ isActive: true })
       .populate("instructor", "name email")
+      .lean()
       .exec();
 
-    res.status(200).json(courses);
+    const normalized = (Array.isArray(courses) ? courses : []).map((course) => {
+      const thumb = course?.thumbnail;
+      const url =
+        (typeof thumb === "string" && thumb) ||
+        (thumb && typeof thumb === "object" && (thumb.url || thumb.path || thumb.secure_url)) ||
+        "";
+      const publicId =
+        (thumb && typeof thumb === "object" && (thumb.publicId || thumb.public_id || thumb.filename)) ||
+        "";
+
+      return {
+        ...course,
+        thumbnail: url ? { url, publicId } : { url: "", publicId: "" },
+      };
+    });
+
+    res.status(200).json(normalized);
   } catch (error) {
     console.error("Error fetching active courses:", error.message);
     res.status(500).json({ error: "Internal Server Error" });

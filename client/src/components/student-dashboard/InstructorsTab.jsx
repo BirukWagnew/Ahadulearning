@@ -4,6 +4,7 @@ import { Loader2, Users, Mail, Star } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "sonner";
+import { resolveMediaUrl } from "@/lib/media";
 
 // Create axios instance with auth headers
 const api = axios.create({
@@ -32,6 +33,8 @@ export const InstructorsTab = () => {
   const { user } = useAuth();
   const [instructors, setInstructors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failedInstructors, setFailedInstructors] = useState(() => new Set());
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
   // Fetch instructors from enrolled courses
   useEffect(() => {
@@ -124,16 +127,38 @@ export const InstructorsTab = () => {
               <div className="flex items-center space-x-4 mb-4">
                 <div className="relative">
                   {instructor.profilePicture ? (
-                    <img
-                      src={instructor.profilePicture}
-                      alt={instructor.name}
-                      className="h-16 w-16 rounded-full object-cover border-2 border-slate-200 dark:border-slate-700"
-                    />
+                    (() => {
+                      const resolved = resolveMediaUrl(instructor.profilePicture, API_BASE_URL) || "";
+                      const src = resolved
+                        ? `${resolved}${resolved.includes("?") ? "&" : "?"}v=${instructor?.updatedAt || ""}`
+                        : "";
+                      const hasFailed = failedInstructors.has(instructor._id);
+                      if (!src || hasFailed) return null;
+                      return (
+                        <img
+                          src={src}
+                          alt={instructor.name}
+                          className="h-16 w-16 rounded-full object-cover border-2 border-slate-200 dark:border-slate-700"
+                          onError={() => {
+                            setFailedInstructors((prev) => {
+                              const next = new Set(prev);
+                              next.add(instructor._id);
+                              return next;
+                            });
+                          }}
+                        />
+                      );
+                    })()
                   ) : (
                     <div className="h-16 w-16 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center">
                       <Users className="h-8 w-8 text-slate-400" />
                     </div>
                   )}
+                  {(instructor.profilePicture && failedInstructors.has(instructor._id)) ? (
+                    <div className="absolute inset-0 h-16 w-16 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                      <Users className="h-8 w-8 text-slate-400" />
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
