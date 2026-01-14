@@ -10,12 +10,14 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
     headers: {
       // Allow media (thumbnails/avatars) from the API server during development.
       // NOTE: This is dev-only; adjust for production as needed.
       'Content-Security-Policy':
         "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; " +
         "img-src 'self' https: data: blob: http://localhost:5000 https://res.cloudinary.com https://*.cloudinary.com; " +
+        "media-src 'self' https: data: blob: http://localhost:5000 https://res.cloudinary.com https://*.cloudinary.com; " +
         "connect-src 'self' ws: http://localhost:5000; " +
         "font-src 'self' https: data:; " +
         "style-src 'self' https: 'unsafe-inline'; " +

@@ -29,9 +29,11 @@ import {
 import { Search, Filter, UserCheck, UserX, Eye } from "lucide-react";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const UserManagement = ({ onViewUser }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRole, setFilterRole] = useState("instructor");
+  const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [users, setUsers] = useState([]);
 
@@ -44,14 +46,13 @@ const UserManagement = ({ onViewUser }) => {
           return;
         }
 
-        console.log("🔍 Making API call to:", `${import.meta.env.VITE_API_BASE_URL}/api/admin/all-users`);
+        console.log("🔍 Making API call to:", `${API_BASE_URL}/api/admin/all-users`);
         console.log("🔍 Token exists:", !!token);
         console.log("🔍 Token length:", token.length);
         console.log("🔍 Token preview:", token.substring(0, 20) + "...");
 
-        const response = await axios.post(
-          `${import.meta.env.VITE_API_BASE_URL}/api/admin/all-users`,
-          {},
+        const response = await axios.get(
+          `${API_BASE_URL}/api/admin/all-users`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -76,8 +77,17 @@ const UserManagement = ({ onViewUser }) => {
       } catch (error) {
         console.error("❌ Error fetching users:", error);
         console.error("❌ Error response:", error.response?.data);
-        toast.error(`Failed to load user data: ${error.response?.data?.message || error.message}`);
+        
+        const errorMessage = error.response?.data?.message || error.message || "Failed to load user data";
+        toast.error(errorMessage);
         setUsers([]);
+        
+        // Additional help for authentication errors
+        if (error.response?.status === 401) {
+          toast.error("Authentication failed. Please log out and log back in as an admin.");
+        } else if (error.response?.status === 403) {
+          toast.error("Access denied. Admin privileges required.");
+        }
       }
     };
 
@@ -90,7 +100,7 @@ const UserManagement = ({ onViewUser }) => {
           user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           user.email.toLowerCase().includes(searchQuery.toLowerCase());
 
-        const matchesRole = user.role === filterRole;
+        const matchesRole = filterRole === "all" || user.role === filterRole;
 
         const userStatus = user.status.toLowerCase();
         const matchesStatus =
@@ -112,9 +122,7 @@ const UserManagement = ({ onViewUser }) => {
       }
 
       await axios.put(
-        `${
-          import.meta.env.VITE_API_BASE_URL
-        }/api/admin/approve-instructor/${userId}`,
+        `${API_BASE_URL}/api/admin/approve-instructor/${userId}`,
         {},
         {
           headers: {
@@ -124,6 +132,13 @@ const UserManagement = ({ onViewUser }) => {
       );
 
       toast.success(`User #${userId} has been approved`);
+      setUsers((prev) =>
+        prev.map((user) =>
+          user._id === userId
+            ? { ...user, isApproved: true, status: "active" }
+            : user
+        )
+      );
     } catch (error) {
       console.error(`Error approving User #${userId}:`, error);
       toast.error(`Failed to approve User #${userId}`);
@@ -139,9 +154,7 @@ const UserManagement = ({ onViewUser }) => {
       }
 
       const response = await axios.delete(
-        `${
-          import.meta.env.VITE_API_BASE_URL
-        }/api/admin/reject-instructor/${userId}`,
+        `${API_BASE_URL}/api/admin/reject-instructor/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -169,7 +182,7 @@ const UserManagement = ({ onViewUser }) => {
       }
 
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/admin/block/${userId}`,
+        `${API_BASE_URL}/api/admin/block/${userId}`,
         {},
         {
           headers: {
@@ -179,8 +192,8 @@ const UserManagement = ({ onViewUser }) => {
       );
 
       toast.success("User blocked successfully");
-      setUsers(
-        users.map((user) =>
+      setUsers((prev) =>
+        prev.map((user) =>
           user._id === userId
             ? { ...user, blocked: true, status: "blocked" }
             : user
@@ -201,7 +214,7 @@ const UserManagement = ({ onViewUser }) => {
       }
 
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/admin/unblock/${userId}`,
+        `${API_BASE_URL}/api/admin/unblock/${userId}`,
         {},
         {
           headers: {
@@ -210,11 +223,12 @@ const UserManagement = ({ onViewUser }) => {
         }
       );
       
-      toast.success(response.data.message);
-      setUsers(
-        users.map((user) =>
+      toast.success(response.data.message || "User unblocked successfully");
+      const nextStatus = response.data?.user?.status || "active";
+      setUsers((prev) =>
+        prev.map((user) =>
           user._id === userId
-            ? { ...user, blocked: false, status: "active" }
+            ? { ...user, blocked: false, status: nextStatus }
             : user
         )
       );
@@ -282,8 +296,10 @@ const UserManagement = ({ onViewUser }) => {
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
                 <SelectItem value="student">Students</SelectItem>
                 <SelectItem value="instructor">Instructors</SelectItem>
+                <SelectItem value="admin">Admins</SelectItem>
               </SelectContent>
             </Select>
 
@@ -317,9 +333,10 @@ const UserManagement = ({ onViewUser }) => {
                 })
                 .map((user) => {
                   const userStatus = user.status.toLowerCase();
+                  const isPendingInstructor = user.role === "instructor" && userStatus === "pending";
                   return (
                     <TableRow
-                      key={user.id}
+                      key={user._id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                       <TableCell>#{user._id}</TableCell>
@@ -347,7 +364,7 @@ const UserManagement = ({ onViewUser }) => {
                             <Eye size={16} />
                           </Button>
 
-                          {userStatus === "pending" && (
+                          {isPendingInstructor && (
                             <>
                               <Button
                                 variant="ghost"
@@ -379,7 +396,7 @@ const UserManagement = ({ onViewUser }) => {
                             </Button>
                           )}
 
-                          {user && user.status === "blocked" && (
+                          {(userStatus === "blocked" || user.blocked) && (
                             <Button
                               variant="ghost"
                               size="icon"

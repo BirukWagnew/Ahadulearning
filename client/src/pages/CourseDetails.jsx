@@ -17,6 +17,14 @@ import { useAuth } from "../context/AuthContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
+const normalizeVideoUrl = (rawUrl) => {
+  if (!rawUrl) return null;
+  if (typeof rawUrl !== "string") return null;
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+  if (rawUrl.startsWith("/uploads")) return `${API_BASE_URL}${rawUrl}`;
+  return rawUrl;
+};
+
 export const CourseDetails = () => {
   const { user } = useAuth();
   const studentId = user?._id;
@@ -49,12 +57,13 @@ export const CourseDetails = () => {
             duration: formatDuration(module.duration),
             lessons: module.lessons?.map(lesson => {
               const videoData = lesson.video || {};
-              const hasValidUrl = !!videoData.url;
+              const normalizedUrl = normalizeVideoUrl(videoData.url);
+              const hasValidUrl = !!normalizedUrl;
               return {
                 ...lesson,
                 duration: formatDuration(lesson.duration),
                 video: {
-                  url: videoData.url || null,
+                  url: normalizedUrl,
                   thumbnailUrl: videoData.thumbnailUrl || null,
                   publicId: videoData.publicId || null,
                   _valid: hasValidUrl

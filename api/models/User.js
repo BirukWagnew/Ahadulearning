@@ -64,7 +64,6 @@ passwordResetOtpExpiration: { type: Date },
  userSchema.pre('save', function(next) {
   if (this.blocked) {
     this.status = 'blocked';   
-    this.isApproved = false;   
   } else {
     this.status = this.isApproved ? 'active' : 'pending';   
   }

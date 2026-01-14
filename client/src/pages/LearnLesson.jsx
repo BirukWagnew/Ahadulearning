@@ -16,6 +16,14 @@ const LearnLesson = () => {
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
+  const normalizeVideoUrl = (rawUrl) => {
+    if (!rawUrl) return "";
+    if (typeof rawUrl !== "string") return "";
+    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+    if (rawUrl.startsWith("/uploads")) return `${API_BASE_URL}${rawUrl}`;
+    return rawUrl;
+  };
+
   const studentId = useMemo(() => {
     try {
       const token = localStorage.getItem("token");
@@ -131,7 +139,7 @@ const LearnLesson = () => {
           />
         ) : lesson?.video?.url ? (
           <VideoPlayer
-            url={lesson.video.url}
+            url={normalizeVideoUrl(lesson.video.url)}
             width="100%"
             height="520px"
             courseId={courseId}

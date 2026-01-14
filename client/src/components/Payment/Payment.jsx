@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { initializePayment } from '../services/paymentService';
+import { initializePayment } from '../../services/paymentService';
 
 const Payment = () => {
   const [loading, setLoading] = useState(false);

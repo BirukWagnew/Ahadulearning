@@ -20,6 +20,8 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const StudentEnrollmentsPerCourse = () => {
   const [enrollmentData, setEnrollmentData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,7 @@ const StudentEnrollmentsPerCourse = () => {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/admin/graphs/enrollments-per-course`,
+          `${API_BASE_URL}/api/admin/graphs/enrollments-per-course`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -86,10 +88,18 @@ const StudentEnrollmentsPerCourse = () => {
         
         console.log("Enrollment API Response:", response.data);
 
-        // Add categories to enrollment data
+        // Check if the response indicates an error
+        if (response.data?.success === false && response.data?.message) {
+          console.error("API returned error:", response.data.message);
+          setError(response.data.message);
+          return;
+        }
+
+        // Handle successful response
         const responseData = response.data;
-        const enrollmentArray = responseData.courses || responseData; // Handle both response formats
-        
+        const enrollmentArray =
+          responseData?.courses || (Array.isArray(responseData) ? responseData : null);
+
         if (!Array.isArray(enrollmentArray)) {
           console.error("Expected array but got:", typeof enrollmentArray, enrollmentArray);
           setError("Invalid response format from server");

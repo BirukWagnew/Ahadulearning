@@ -57,26 +57,33 @@ const PlatformAnalytics = () => {
         const token = localStorage.getItem("token");
         if (!token) {
           toast.error("No authentication token found");
+          setError("Authentication required");
           return;
         }
 
+        console.log("Fetching analytics data...");
+        
         // Fetch platform overview
         const overviewResponse = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/admin/graphs/overview`,
+          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/admin/graphs/overview`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
 
+        console.log("Analytics response:", overviewResponse.data);
+
         if (overviewResponse.data?.success) {
           setPlatformData(overviewResponse.data);
+          setError(null);
         } else {
-          throw new Error("Failed to fetch platform data");
+          throw new Error(overviewResponse.data?.message || "Failed to fetch platform data");
         }
       } catch (error) {
         console.error("Error fetching platform data:", error);
-        setError(error.message);
-        toast.error("Failed to load analytics data");
+        const errorMessage = error.response?.data?.message || error.message || "Failed to load analytics data";
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -200,11 +207,22 @@ const PlatformAnalytics = () => {
                   Error loading analytics data
                 </CardDescription>
               </div>
+              <Button onClick={() => window.location.reload()} variant="outline">
+                Retry
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center h-64">
-              <p className="text-red-500">Error: {error}</p>
+            <div className="flex flex-col items-center justify-center h-64 space-y-4">
+              <p className="text-red-500 text-center">Error: {error}</p>
+              <div className="text-sm text-gray-500 text-center max-w-md">
+                <p>Please check:</p>
+                <ul className="list-disc list-inside mt-2">
+                  <li>You are logged in as an admin</li>
+                  <li>Your internet connection is stable</li>
+                  <li>The backend server is running</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>

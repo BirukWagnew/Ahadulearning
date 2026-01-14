@@ -22,6 +22,8 @@ import { Search, FileText, FileDown, Check, X, AlertCircle, Calendar } from "luc
 import { toast } from "sonner";
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const PaymentManagement = () => {
   const [activeTab, setActiveTab] = useState("transactions");
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,10 +44,10 @@ const PaymentManagement = () => {
 
         // Fetch payments and withdrawals in parallel
         const [paymentsResponse, withdrawalsResponse] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/payments`, {
+          axios.get(`${API_BASE_URL}/api/admin/payments`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/withdrawals`, {
+          axios.get(`${API_BASE_URL}/api/admin/withdrawals`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -109,12 +111,16 @@ const PaymentManagement = () => {
     const courseTitle = transaction.courseId?.title || '';
     const transactionId = transaction._id || transaction.tx_ref || '';
     const instructorName = transaction.courseId?.instructor?.name || 'N/A';
+    const amount = transaction.amount || 0;
+    const date = transaction.createdAt || transaction.date || new Date();
     
     return (
       studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       courseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
       transactionId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      instructorName.toLowerCase().includes(searchQuery.toLowerCase())
+      instructorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      amount.toString().includes(searchQuery.toLowerCase()) ||
+      date.toLocaleDateString().toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
   
@@ -122,10 +128,14 @@ const PaymentManagement = () => {
   const filteredPayouts = payoutRequests.filter(payout => {
     const instructorName = payout.user?.name || payout.instructor || '';
     const payoutId = payout._id || payout.reference || '';
+    const amount = payout.amount || 0;
+    const date = payout.createdAt || new Date();
     
     return (
       instructorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payoutId.toLowerCase().includes(searchQuery.toLowerCase())
+      payoutId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      amount.toString().includes(searchQuery.toLowerCase()) ||
+      date.toLocaleDateString().toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
   
@@ -138,7 +148,7 @@ const PaymentManagement = () => {
       }
 
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/admin/withdrawals/approve/${payoutId}`,
+        `${API_BASE_URL}/api/admin/withdrawals/approve/${payoutId}`,
         {},
         {
           headers: {
@@ -178,7 +188,7 @@ const PaymentManagement = () => {
       if (!reason) return;
 
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/admin/withdrawals/reject/${payoutId}`,
+        `${API_BASE_URL}/api/admin/withdrawals/reject/${payoutId}`,
         { reason },
         {
           headers: {
@@ -215,7 +225,7 @@ const PaymentManagement = () => {
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_BASE_URL}/api/admin/payments/report?format=csv`,
+        `${API_BASE_URL}/api/admin/payments/report?format=csv`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -223,7 +233,7 @@ const PaymentManagement = () => {
         }
       );
 
-      console.log("Report API Response:", response.data);
+      console.log(" Report API Response:", response.data);
 
       // Handle different response formats
       let csvData;
@@ -234,11 +244,21 @@ const PaymentManagement = () => {
         // Nested CSV string response
         csvData = response.data.data;
       } else if (response.data?.summary && response.data?.payments && response.data?.withdrawals) {
-        // JSON response - convert to CSV manually
+        // JSON response - convert to CSV manually with summary
         const { summary, payments, withdrawals } = response.data;
         
-        // Create CSV headers
-        const headers = ['Type,ID,Date,User,Amount,Status'];
+        // Create CSV headers with summary
+        const headers = ['Summary', '', '', '', '', '', '', '', '', ''];
+        const summaryRow = [
+          'Summary',
+          `Total Transactions: ${payments.length}`,
+          `Total Withdrawals: ${withdrawals.length}`,
+          `Total Revenue: $${(payments.reduce((sum, p) => sum + (p.amount || 0), 0)).toFixed(2)}`,
+          `Total Payouts: $${(withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0)).toFixed(2)}`,
+          '',
+          '',
+          ''
+        ];
         
         // Convert payments to CSV rows
         const paymentRows = payments.map(p => [
@@ -246,7 +266,8 @@ const PaymentManagement = () => {
           p._id || p.tx_ref || '',
           new Date(p.createdAt || Date.now()).toLocaleDateString(),
           p.studentId?.name || 'N/A',
-          p.amount?.toFixed(2) || '0.00',
+          p.courseId?.title || 'N/A',
+          (p.amount || 0).toFixed(2),
           p.status || 'unknown'
         ]);
         
@@ -256,12 +277,12 @@ const PaymentManagement = () => {
           w._id || w.reference || '',
           new Date(w.createdAt || Date.now()).toLocaleDateString(),
           w.user?.name || 'N/A',
-          w.amount?.toFixed(2) || '0.00',
+          (w.amount || 0).toFixed(2),
           w.status || 'unknown'
         ]);
         
         // Combine all rows
-        const allRows = [headers.join(','), ...paymentRows, ...withdrawalRows];
+        const allRows = [headers.join(','), summaryRow, ...paymentRows, ...withdrawalRows];
         csvData = allRows.join('\n');
       } else {
         console.error("Unexpected response format:", response.data);
@@ -417,12 +438,12 @@ const PaymentManagement = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredPayouts.map((payout) => (
-                    <TableRow key={payout.id}>
-                      <TableCell className="font-mono text-xs">{payout.id}</TableCell>
-                      <TableCell>{payout.date}</TableCell>
-                      <TableCell>{payout.instructor}</TableCell>
-                      <TableCell className="font-mono">${payout.amount.toFixed(2)}</TableCell>
-                      <TableCell>{payout.courses}</TableCell>
+                    <TableRow key={payout._id}>
+                      <TableCell className="font-mono text-xs">{payout._id}</TableCell>
+                      <TableCell>{new Date(payout.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>{payout.user?.name || 'N/A'}</TableCell>
+                      <TableCell className="font-mono">${(payout.amount || 0).toFixed(2)}</TableCell>
+                      <TableCell>-</TableCell>
                       <TableCell>{getStatusBadge(payout.status)}</TableCell>
                       <TableCell>
                         {payout.status === "pending" && (
@@ -431,7 +452,7 @@ const PaymentManagement = () => {
                               variant="default" 
                               size="sm" 
                               className="h-8 bg-green-600 hover:bg-green-700"
-                              onClick={() => handleApprovePayout(payout.id)}
+                              onClick={() => handleApprovePayout(payout._id)}
                             >
                               Approve
                             </Button>
@@ -439,7 +460,7 @@ const PaymentManagement = () => {
                               variant="outline" 
                               size="sm" 
                               className="h-8 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
-                              onClick={() => handleRejectPayout(payout.id)}
+                              onClick={() => handleRejectPayout(payout._id)}
                             >
                               Reject
                             </Button>

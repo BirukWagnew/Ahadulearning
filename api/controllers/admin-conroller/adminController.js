@@ -6,6 +6,7 @@ import { deleteFromCloudinary } from '../../services/cloudStorage.js';
 import Payment from '../../models/Payment.js';
 import Withdrawal from '../../models/Withdrawal.js';
 import Enrollment from '../../models/Enrollment.js';
+import Progress from '../../models/Progress.js';
 
 export const approveInstructor = async (req, res) => {
     const { userId } = req.params;
@@ -50,14 +51,33 @@ export const approveInstructor = async (req, res) => {
 
 export const getAllCoursesAdmin = async (req, res) => {
   try {
-    const courses = await Course.find({})
+    const { publish } = req.query;
+    
+    let filter = {};
+    if (publish === 'true') {
+      filter.published = true;
+    }
+    
+    console.log("🔍 Admin courses filter:", filter);
+    
+    const courses = await Course.find(filter)
       .populate('instructor', 'name email')
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ courses });
+    console.log("📚 Found courses:", courses.length);
+
+    // Always return consistent structure
+    return res.status(200).json({ 
+      success: true,
+      courses: courses 
+    });
   } catch (error) {
     console.error('Error fetching courses (admin):', error);
-    return res.status(500).json({ message: 'Server error while fetching courses' });
+    return res.status(500).json({ 
+      success: false,
+      message: 'Server error while fetching courses',
+      courses: [] 
+    });
   }
 };
 
@@ -208,23 +228,34 @@ export const getUsersByRole = async (req, res) => {
   }
 };
 
-
-
-
 export const blockUser = async (req, res) => {
   try {
+    console.log("🔒 Block user request received for ID:", req.params.id);
+    console.log("🔒 Request method:", req.method);
+    console.log("🔒 Request URL:", req.originalUrl);
+    console.log("🔒 Request user:", req.user);
+    
     const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log("Invalid user ID:", id);
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
     
     const user = await User.findById(id);
     if (!user) {
+      console.log("User not found:", id);
       return res.status(404).json({ message: "User not found" });
     }
 
+    console.log("Found user to block:", user.name, user.email);
+
     // Block the user
     user.blocked = true;
-    user.isApproved = false;
     user.status = 'blocked';
     await user.save();
+    
+    console.log("User blocked successfully:", user.name);
     
     // Send email to the user about being blocked
     const subject = 'Your Account Has Been Blocked';
@@ -253,21 +284,31 @@ export const blockUser = async (req, res) => {
     } else {
       console.log(`User ${id} is not currently connected but is now blocked.`);
     }
-
+    
     return res.status(200).json({ 
       message: "User blocked successfully.",
-      userId: id
+      userId: id,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+        blocked: user.blocked
+      }
     });
   } catch (error) {
     console.error("Error blocking user:", error);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-
-// Controller to unblock a user
 export const unblockUser = async (req, res) => {
   try {
+    console.log(" Unblock user request received for ID:", req.params.id);
+    console.log(" Request method:", req.method);
+    console.log(" Request URL:", req.originalUrl);
+    console.log(" Request user:", req.user);
+    
     const { id } = req.params;
     const user = await User.findById(id);
 
@@ -276,7 +317,13 @@ export const unblockUser = async (req, res) => {
     }
 
     user.blocked = false;
-    user.isApproved = true; 
+
+    // Repair legacy state: previous block logic incorrectly set isApproved=false for students/admins.
+    if (user.role !== 'instructor' && !user.isApproved) {
+      user.isApproved = true;
+    }
+    user.status = user.isApproved ? 'active' : 'pending';
+    
     await user.save();
 
     const subject = 'Your Account Has Been Unblocked';
@@ -290,21 +337,28 @@ export const unblockUser = async (req, res) => {
 
     await sendEmail(user.email, subject, text, htmlContent);
 
-
-    return res.status(200).json({ message: 'User has been unblocked and approval granted' });
+    return res.status(200).json({ 
+      message: 'User has been unblocked successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        blocked: user.blocked
+      }
+    });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error unblocking user:", error);
     return res.status(500).json({ message: 'Server error' });
   }
 };
 
-
-// Get single user by ID
 export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-
+    
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
@@ -563,15 +617,26 @@ export const getCourseStudents = async (req, res) => {
       .populate('studentId', 'name email')
       .sort({ enrolledAt: -1 });
 
-    // Transform the data to match expected format
-    const students = enrollments.map(enrollment => ({
-      _id: enrollment.studentId._id,
-      name: enrollment.studentId.name,
-      email: enrollment.studentId.email,
-      enrolledAt: enrollment.enrolledAt,
-      progress: enrollment.progress || 0,
-      status: enrollment.status || 'active'
-    }));
+    // Get progress data for all students in this course
+    const progressRecords = await Progress.find({ courseId })
+      .populate('studentId', 'name email');
+
+    // Transform the data to match expected format with progress
+    const students = enrollments.map(enrollment => {
+      const progress = progressRecords.find(p => 
+        p.studentId._id.toString() === enrollment.studentId._id.toString()
+      );
+      
+      return {
+        _id: enrollment.studentId._id,
+        name: enrollment.studentId.name,
+        email: enrollment.studentId.email,
+        enrolledAt: enrollment.enrolledAt,
+        progress: progress ? progress.progressPercentage : 0,
+        status: enrollment.status || 'active',
+        completedLessons: progress ? progress.completedLessons : []
+      };
+    });
 
     res.status(200).json({
       success: true,

@@ -1,7 +1,7 @@
 import Enrollment from '../../models/Enrollment.js';
 import Course from '../../models/Course.js';
 import User from '../../models/User.js';
-import Payment from '../../models/Transaction.js';
+import Payment from '../../models/Payment.js';
 import mongoose from 'mongoose';
 
 export const getStudentEnrollmentsPerCourse = async (req, res) => {
@@ -45,13 +45,13 @@ export const getPlatformOverview = async (req, res) => {
       User.countDocuments({ role: 'instructor' }),
       Course.countDocuments(),
       Enrollment.countDocuments(),
-      Payment.countDocuments({ status: 'completed' })
+      Payment.countDocuments({ status: 'success' })
     ]);
 
     // Calculate total revenue
     const revenueData = await Payment.aggregate([
-      { $match: { status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$amountPaid' } } }
+      { $match: { status: 'success' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
     
     const actualRevenue = revenueData[0]?.total || 0;
@@ -92,7 +92,7 @@ export const getPlatformOverview = async (req, res) => {
     const monthlyRevenue = await Payment.aggregate([
       {
         $match: {
-          status: 'completed',
+          status: 'success',
           createdAt: { $gte: sixMonthsAgo }
         }
       },
@@ -104,7 +104,7 @@ export const getPlatformOverview = async (req, res) => {
               date: "$createdAt"
             }
           },
-          revenue: { $sum: '$amountPaid' }
+          revenue: { $sum: '$amount' }
         }
       },
       {
@@ -213,19 +213,19 @@ export const getRevenueStatistics = async (req, res) => {
     }
 
     const revenueStats = await Payment.aggregate([
-      { $match: { status: 'completed', ...dateFilter } },
+      { $match: { status: 'success', ...dateFilter } },
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: '$amountPaid' },
+          totalRevenue: { $sum: '$amount' },
           totalTransactions: { $sum: 1 },
-          averageTransaction: { $avg: '$amountPaid' }
+          averageTransaction: { $avg: '$amount' }
         }
       }
     ]);
 
     const monthlyRevenue = await Payment.aggregate([
-      { $match: { status: 'completed', ...dateFilter } },
+      { $match: { status: 'success', ...dateFilter } },
       {
         $group: {
           _id: {
@@ -234,7 +234,7 @@ export const getRevenueStatistics = async (req, res) => {
               date: "$createdAt"
             }
           },
-          revenue: { $sum: '$amountPaid' },
+          revenue: { $sum: '$amount' },
           transactions: { $sum: 1 }
         }
       },

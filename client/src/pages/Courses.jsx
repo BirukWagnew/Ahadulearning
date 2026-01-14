@@ -43,19 +43,24 @@ const Courses = () => {
     try {
       // Fetch active courses only
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/courses/active`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const courseData = await response.json();
-
+      
+      // Ensure courseData is an array
+      const coursesArray = Array.isArray(courseData) ? courseData : [];
+      
       // Fetch review stats and student count for each course
       const coursesWithData = await Promise.all(
-        courseData.map(async (course) => {
+        coursesArray.map(async (course) => {
           const courseId = course.id || course._id;
           let avgRating = "N/A";
           let totalReviews = 0;

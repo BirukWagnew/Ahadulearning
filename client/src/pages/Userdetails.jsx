@@ -18,6 +18,8 @@ import {
   FileText,
   CheckCircle,
   XCircle,
+  Ban,
+  Unlock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -33,9 +35,8 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
       if (!userId) return;
       try {
         const token = localStorage.getItem("token");
-        const response = await axios.post(
+        const response = await axios.get(
           `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/${userId}`,
-          {},
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -132,6 +133,74 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
         error.response?.data || error.message
       );
       toast.error("Failed to reject user");
+    }
+  };
+
+  const handleBlockUser = async (userId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const blockUrl = `${import.meta.env.VITE_API_BASE_URL}/api/admin/block/${userId}`;
+      console.log("🔒 Blocking user at URL:", blockUrl);
+      console.log("🔒 User ID:", userId);
+
+      const response = await axios.put(
+        blockUrl,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("✅ Block response:", response.data);
+      toast.success("User blocked successfully");
+      setUserData((prev) => ({ ...prev, status: "blocked" }));
+    } catch (error) {
+      console.error("❌ Error blocking user:", error);
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
+      console.error("❌ Error URL:", error.config?.url);
+      toast.error(`Failed to block user: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
+  const handleUnblockUser = async (userId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const unblockUrl = `${import.meta.env.VITE_API_BASE_URL}/api/admin/unblock/${userId}`;
+      console.log("🔓 Unblocking user at URL:", unblockUrl);
+      console.log("🔓 User ID:", userId);
+
+      const response = await axios.put(
+        unblockUrl,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      
+      console.log("✅ Unblock response:", response.data);
+      toast.success(response.data.message || "User unblocked successfully");
+      setUserData((prev) => ({ ...prev, status: "active" }));
+    } catch (error) {
+      console.error("❌ Error unblocking user:", error);
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
+      console.error("❌ Error URL:", error.config?.url);
+      toast.error(`Failed to unblock user: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -280,6 +349,24 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
                   Reject User
                 </Button>
               </>
+            ) : userData.status === "active" ? (
+              <Button
+                variant="outline"
+                className="w-full flex items-center text-yellow-600 border-yellow-200 hover:bg-yellow-50 dark:border-yellow-800 dark:hover:bg-yellow-950/30"
+                onClick={() => handleBlockUser(userData._id)}
+              >
+                <Ban size={16} className="mr-2" />
+                Block User
+              </Button>
+            ) : userData.status === "blocked" ? (
+              <Button
+                variant="outline"
+                className="w-full flex items-center text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30"
+                onClick={() => handleUnblockUser(userData._id)}
+              >
+                <Unlock size={16} className="mr-2" />
+                Unblock User
+              </Button>
             ) : null}
           </CardFooter>
         </Card>

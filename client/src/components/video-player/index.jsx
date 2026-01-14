@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactPlayer from "react-player";
 import { Slider } from "../ui/slider";
 import { Button } from "../ui/button";
@@ -35,12 +35,56 @@ function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [playerError, setPlayerError] = useState(null);
 
   const playerRef = useRef(null);
   const playerContainerRef = useRef(null);
 
+  const resolvedUrl = useMemo(() => {
+    if (!url) return "";
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+
+    // Normalize windows paths/backslashes
+    const normalizedSlashes = trimmed.replace(/\\/g, "/");
+
+    if (normalizedSlashes.startsWith("http://") || normalizedSlashes.startsWith("https://")) {
+      // Cloudinary: force mp4 container for better browser compatibility
+      if (
+        normalizedSlashes.includes("res.cloudinary.com") &&
+        normalizedSlashes.includes("/video/upload/") &&
+        !normalizedSlashes.includes("/video/upload/f_mp4/")
+      ) {
+        return normalizedSlashes.replace("/video/upload/", "/video/upload/f_mp4/");
+      }
+      return normalizedSlashes;
+    }
+
+    // Normalize local uploads paths
+    if (normalizedSlashes.startsWith("/uploads")) {
+      return `${API_BASE_URL}${normalizedSlashes}`;
+    }
+    if (normalizedSlashes.startsWith("uploads/")) {
+      return `${API_BASE_URL}/${normalizedSlashes}`;
+    }
+
+    return normalizedSlashes;
+  }, [url]);
+
+  useEffect(() => {
+    setPlayerError(null);
+    setPlaying(false);
+    setPlayed(0);
+    setSeeking(false);
+    setHasCompleted(false);
+  }, [resolvedUrl, lessonId]);
+
   // Play/Pause toggle
   function handlePlayAndPause() {
+    if (playerError) {
+      setPlayerError(null);
+    }
     setPlaying(!playing);
   }
 
@@ -50,6 +94,33 @@ function VideoPlayer({
       setPlayed(state.played);
     }
   }
+
+  // Handle video errors and buffering
+  const handleVideoError = (error) => {
+    console.error('Video player error:', error);
+    console.error('Video URL:', resolvedUrl || url);
+    setPlayerError("Video failed to load");
+    setPlaying(false);
+
+    // Try to recover by reloading
+    if (playerRef.current && resolvedUrl) {
+      const currentTime = playerRef.current.getCurrentTime();
+      console.log('Attempting to reload video from:', currentTime);
+      playerRef.current.seekTo(currentTime + 0.1);
+    }
+  };
+
+  // Handle buffering
+  const handleBuffer = () => {
+    console.log('Video is buffering...');
+  };
+
+  // Handle video ready
+  const handleReady = () => {
+    console.log('Video player is ready');
+    console.log('Video URL:', resolvedUrl || url);
+    setPlayerError(null);
+  };
 
   function handleRewind() {
     playerRef?.current?.seekTo(playerRef?.current?.getCurrentTime() - 5);
@@ -138,69 +209,104 @@ function VideoPlayer({
 
   // Save progress only if enrolled
   useEffect(() => {
-    if (played >= 0.99 && !hasCompleted && isEnrolled) {
-      setHasCompleted(true);
+    if (played < 0.99 || hasCompleted || !isEnrolled) return;
 
-      const updateProgress = async () => {
-        try {
-          const token = localStorage.getItem("token");
-          const response = await fetch(`${API_BASE_URL}/api/progress`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              studentId,
-              courseId,
-              lessonId,
-            }),
-          });
+    setHasCompleted(true);
 
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.error || "Failed to update progress");
-          }
-
-          toast.success("Lesson marked as completed!");
-          onProgressUpdate?.({
+    const updateProgress = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE_URL}/api/progress`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
             studentId,
             courseId,
             lessonId,
-            isCompleted: true,
-            progressValue: played,
-          });
-          onComplete?.(); // Call onComplete when lesson is marked as completed
-        } catch (error) {
-          console.error("Error updating progress:", error);
-          toast.error("Failed to mark lesson as completed.");
-        }
-      };
+          }),
+        });
 
-      updateProgress();
-    }
-  }, [played, hasCompleted, studentId, courseId, lessonId, isEnrolled, onProgressUpdate, onComplete]);
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to update progress");
+        }
+
+        toast.success("Lesson marked as completed!");
+        onProgressUpdate?.({
+          studentId,
+          courseId,
+          lessonId,
+          isCompleted: true,
+          progressValue: played,
+        });
+        onComplete?.(); // Call onComplete when lesson is marked as completed
+      } catch (error) {
+        console.error("Error updating progress:", error);
+        toast.error("Failed to mark lesson as completed.");
+      }
+    };
+
+    updateProgress();
+  }, [played, hasCompleted, isEnrolled, studentId, courseId, lessonId, onProgressUpdate, onComplete]);
 
   return (
     <div
       ref={playerContainerRef}
-      className={`relative bg-gray-900 rounded-lg overflow-hidden shadow-2xl transition-all duration-300 ease-in-out 
-      ${isFullScreen ? "w-screen h-screen" : ""}`}
+      className={`relative bg-gray-900 rounded-lg overflow-hidden shadow-2xl transition-all duration-300 ease-in-out ${
+        isFullScreen ? "w-screen h-screen" : ""
+      }`}
       style={{ width, height }}
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >
       <ReactPlayer
+        key={resolvedUrl || 'no-url'}
         ref={playerRef}
         className="absolute top-0 left-0"
         width="100%"
         height="100%"
-        url={url}
+        url={resolvedUrl || undefined}
         playing={playing}
         volume={volume}
         muted={muted}
         onProgress={handleProgress}
+        onError={handleVideoError}
+        onBuffer={handleBuffer}
+        onReady={handleReady}
+        config={{
+          file: {
+            forceVideo: true,
+            attributes: {
+              preload: "metadata",
+              playsInline: true,
+            }
+          }
+        }}
       />
+
+      {(!resolvedUrl || playerError) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white p-4">
+          <div className="text-center max-w-xl">
+            <div className="text-sm font-semibold mb-2">
+              {playerError ? "Video failed to load" : "No video URL provided"}
+            </div>
+            {resolvedUrl && (
+              <div className="text-xs opacity-80 break-all mb-3">{resolvedUrl}</div>
+            )}
+            {resolvedUrl && (
+              <Button
+                variant="secondary"
+                onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")}
+              >
+                Open Video in New Tab
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {hasCompleted && isEnrolled && (
         <div className="absolute top-4 right-4 bg-green-600 text-white px-3 py-1 text-sm rounded">
@@ -262,4 +368,4 @@ function VideoPlayer({
   );
 }
 
-export default VideoPlayer;  
+export default VideoPlayer;

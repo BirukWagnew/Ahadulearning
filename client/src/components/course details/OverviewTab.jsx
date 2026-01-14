@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import axios from "axios";
 import { useState, useEffect } from "react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 export const OverviewTab = ({ course, total }) => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,13 +19,14 @@ export const OverviewTab = ({ course, total }) => {
         console.log("🔍 Checking enrollment for:", user._id, course._id);
 
         const res = await axios.get(
-          `http://localhost:5000/api/enrollments/check?studentId=${user._id}&courseId=${course._id}`,
+          `${API_BASE_URL}/api/enrollments/check?studentId=${user._id}&courseId=${course._id}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           }
         );
+
         console.log("✅ Enrollment check response:", res.data);
 
         // Handle response structure { isEnrolled: true }
@@ -49,7 +52,7 @@ export const OverviewTab = ({ course, total }) => {
         return;
       }
       const res = await axios.post(
-        "http://localhost:5000/api/payment/initiate",
+        `${API_BASE_URL}/api/payment/initiate`,
         {
           amount: course.price,
           courseId: course._id,

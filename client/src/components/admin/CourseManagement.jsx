@@ -24,6 +24,8 @@ import { Search, Plus, Edit, Trash2, Eye, Users, BookOpen, DollarSign, X, Mail, 
 import { toast } from "sonner";
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const CourseManagement = () => {
   const [courses, setCourses] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,6 +34,8 @@ const CourseManagement = () => {
   const [enrolledStudents, setEnrolledStudents] = useState([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [showStudentsModal, setShowStudentsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null);
 
   // Fetch courses
   useEffect(() => {
@@ -44,7 +48,7 @@ const CourseManagement = () => {
         }
 
         const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses`,
+          `${API_BASE_URL}/api/admin/courses?publish=true`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -53,13 +57,35 @@ const CourseManagement = () => {
         console.log("🔍 Courses API Response:", response.data);
 
         let coursesData = [];
-        if (response.data?.courses) {
+        
+        // Handle different response formats from backend
+        if (Array.isArray(response.data?.courses)) {
           coursesData = response.data.courses;
-        } else if (response.data) {
+        } else if (Array.isArray(response.data)) {
           coursesData = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          // If it's an object but doesn't have courses array, check if it's the courses array directly
+          if (Array.isArray(response.data)) {
+            coursesData = response.data;
+          } else {
+            console.log("❌ Unexpected response structure:", response.data);
+            toast.error("Unexpected API response structure");
+            setCourses([]);
+            return;
+          }
         } else {
           console.log("❌ Invalid courses API response:", response.data);
           toast.error("Invalid API response format");
+          setCourses([]);
+          return;
+        }
+
+        console.log("📚 Courses data received:", coursesData.length, "courses");
+
+        // Ensure coursesData is an array before mapping
+        if (!Array.isArray(coursesData)) {
+          console.error("❌ coursesData is not an array:", coursesData);
+          toast.error("Invalid courses data format");
           setCourses([]);
           return;
         }
@@ -73,7 +99,7 @@ const CourseManagement = () => {
             // Use the working admin endpoint
             try {
               const enrollmentResponse = await axios.get(
-                `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses/${course._id}/students`,
+                `${API_BASE_URL}/api/admin/courses/${course._id}/students`,
                 {
                   headers: { Authorization: `Bearer ${token}` },
                 }
@@ -132,7 +158,7 @@ const CourseManagement = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses/${courseId}`,
+        `${API_BASE_URL}/api/admin/courses/${courseId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -148,6 +174,40 @@ const CourseManagement = () => {
 
   const handleViewCourse = (course) => {
     setSelectedCourse(course);
+  };
+
+  const handleEditCourse = (course) => {
+    setEditingCourse(course);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingCourse(null);
+  };
+
+  const handleUpdateCourse = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.put(
+        `${API_BASE_URL}/api/courses/${editingCourse._id}`,
+        editingCourse,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Update courses list with updated course
+      setCourses(courses.map(course => 
+        course._id === editingCourse._id ? response.data : course
+      ));
+      
+      toast.success("Course updated successfully");
+      handleCloseEditModal();
+    } catch (error) {
+      console.error("Error updating course:", error);
+      toast.error("Failed to update course");
+    }
   };
 
   const handleCloseCourseDetail = () => {
@@ -168,7 +228,7 @@ const CourseManagement = () => {
       // Use the working admin endpoint
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/admin/courses/${courseId}/students`,
+          `${API_BASE_URL}/api/admin/courses/${courseId}/students`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -229,6 +289,119 @@ const CourseManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Edit Course Modal */}
+      {showEditModal && editingCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-semibold">Edit Course</h3>
+              <Button variant="ghost" size="sm" onClick={handleCloseEditModal}>
+                ×
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Course Title</Label>
+                <Input
+                  id="title"
+                  value={editingCourse.title || ''}
+                  onChange={(e) => setEditingCourse({...editingCourse, title: e.target.value})}
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={editingCourse.description || ''}
+                  onChange={(e) => setEditingCourse({...editingCourse, description: e.target.value})}
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    value={editingCourse.category || ''}
+                    onChange={(e) => setEditingCourse({...editingCourse, category: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="level">Level</Label>
+                  <Select value={editingCourse.level || ''} onValueChange={(value) => setEditingCourse({...editingCourse, level: value})}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="price">Price ($)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editingCourse.price || ''}
+                    onChange={(e) => setEditingCourse({...editingCourse, price: parseFloat(e.target.value) || 0})}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={editingCourse.status || 'active'} onValueChange={(value) => setEditingCourse({...editingCourse, status: value})}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="requirements">Requirements (one per line)</Label>
+                <Textarea
+                  id="requirements"
+                  value={(editingCourse.requirements || []).join('\n')}
+                  onChange={(e) => setEditingCourse({...editingCourse, requirements: e.target.value.split('\n').filter(r => r.trim())})}
+                  className="mt-1"
+                  rows={3}
+                  placeholder="Enter requirements, one per line"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={handleCloseEditModal}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateCourse}>
+                Update Course
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Course Detail Modal */}
       {selectedCourse && !showStudentsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -486,7 +659,7 @@ const CourseManagement = () => {
                           variant="ghost"
                           size="sm"
                           className="text-blue-600 hover:text-blue-800"
-                          onClick={() => alert('Edit functionality coming soon!')}
+                          onClick={() => handleEditCourse(course)}
                         >
                           <Edit size={16} />
                         </Button>
