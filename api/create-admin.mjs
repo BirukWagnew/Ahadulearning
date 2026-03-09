@@ -12,14 +12,14 @@ const __dirname = dirname(__filename);
 async function createAdmin() {
   try {
     // Connect to database
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Import User model
     const User = (await import('./models/User.js')).default;
 
     // Check if admin exists
-    const existingAdmin = await User.findOne({ email: 'admin@fidelhub.com' });
+    const existingAdmin = await User.findOne({ email: 'admin@ahadulearning.com' });
     
     if (existingAdmin) {
       console.log('👤 Admin user already exists');
@@ -46,7 +46,7 @@ async function createAdmin() {
       
       const admin = new User({
         name: 'System Administrator',
-        email: 'admin@fidelhub.com',
+        email: 'admin@ahadulearning.com',
         role: 'admin',
         password: hashedPassword,
         isApproved: true,
@@ -55,7 +55,7 @@ async function createAdmin() {
       
       await admin.save();
       console.log('✅ Admin user created successfully!');
-      console.log('Email: admin@fidelhub.com');
+      console.log('Email: admin@ahadulearning.com');
       console.log('Password: Admin123!@#');
     }
 

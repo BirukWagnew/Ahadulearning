@@ -33,6 +33,11 @@ function Contact() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const API_URL =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:5000";
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -52,11 +57,12 @@ function Contact() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/contact/send-message`, {
+      const response = await fetch(`${API_URL}/api/contact/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
@@ -65,7 +71,9 @@ function Contact() {
         }),
       });
 
-      if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data?.success !== false) {
         toast.success(
           "Your message has been sent successfully! We'll get back to you soon."
         );
@@ -76,8 +84,7 @@ function Contact() {
           message: "",
         });
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || "Failed to send message. Please try again.");
+        toast.error(data.message || "Failed to send message. Please try again.");
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -395,11 +402,12 @@ function Contact() {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
             <div className="h-80 rounded-lg overflow-hidden">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3978.734567890123!2d39.6345678!3d11.1200000!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x164b85c1234567890%3A0xabcdef1234567890!2sDessie%20-%20Kombelcha%20Road%2C%20Dessie%2C%20Ethiopia!5e0!3m2!1sen!2sus!4v1699999999999!5m2!1sen!2sus"
+                title="Ahadu Learning Location Map"
+                src="https://www.openstreetmap.org/export/embed.html?bbox=39.6180%2C11.1190%2C39.6480%2C11.1490&layer=mapnik&marker=11.1340%2C39.6330"
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
-                allowFullScreen=""
+                allowFullScreen
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               ></iframe>

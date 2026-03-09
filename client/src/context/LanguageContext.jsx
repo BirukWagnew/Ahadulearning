@@ -116,12 +116,12 @@ const tiTranslations = {
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguageState] = useState(() => {
-    const savedLanguage = localStorage.getItem("fidelhub-language");
+    const savedLanguage = localStorage.getItem("ahadulearning-language");
     return savedLanguage || "en";
   });
 
   useEffect(() => {
-    localStorage.setItem("fidelhub-language", language);
+    localStorage.setItem("ahadulearning-language", language);
     document.documentElement.lang = language;
   }, [language]);
 

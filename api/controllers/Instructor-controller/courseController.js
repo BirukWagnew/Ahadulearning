@@ -67,6 +67,21 @@ export const checkImageForNSFW = async (imageUrl) => {
 
 export const createCourse = asyncHandler(async (req, res) => {
   const { title, description, category, level, price, requirements } = req.body;
+  
+  // Convert requirements string to array if needed
+  let parsedRequirements = [];
+  if (requirements) {
+    if (typeof requirements === 'string') {
+      // Split by newlines or commas, trim and filter empty
+      parsedRequirements = requirements
+        .split(/[\n,]/)
+        .map(r => r.trim())
+        .filter(r => r.length > 0);
+    } else if (Array.isArray(requirements)) {
+      parsedRequirements = requirements;
+    }
+  }
+
   if (containsBannedContent(title) || containsBannedContent(description)) {
     return res.status(400).json({ message: "Inappropriate content is not allowed." });
   }
@@ -77,7 +92,7 @@ export const createCourse = asyncHandler(async (req, res) => {
     category,
     level,
     price,
-    requirements: requirements || []
+    requirements: parsedRequirements
   });
 
   if (req.file) {
@@ -166,7 +181,7 @@ export const getRelatedCourses = async (req, res) => {
 
  
 export const getCourses = asyncHandler(async (req, res) => {
-  const courses = await Course.find({ published: true })
+  const courses = await Course.find({ published: true, isActive: true })
     .populate('instructor', 'name email')
     .populate({
       path: 'modules',
@@ -249,6 +264,7 @@ export const getInstructorCourses = async (req, res) => {
 
     const courses = await Course.find({
       instructor: new mongoose.Types.ObjectId(instructorId),
+      isActive: true,
     });
 
     if (!courses || courses.length === 0) {
@@ -257,6 +273,7 @@ export const getInstructorCourses = async (req, res) => {
 
     res.status(200).json(courses);
   } catch (error) {
+    console.error('Course creation error:', error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -269,7 +286,7 @@ export const getCourseById = asyncHandler(async (req, res) => {
     throw new Error('Invalid course ID');
   }
 
-  const course = await Course.findById(req.params.id)
+  const course = await Course.findOne({ _id: req.params.id, isActive: true })
     .populate('instructor', 'name email')
     .populate({
       path: 'modules',
@@ -467,7 +484,9 @@ export const getInstructorCoursesWithProgress = async (req, res) => {
         .populate('studentId', 'name email');  // Populate student details
 
       const studentsProgress = progressRecords.map(record => {
-        const enrollment = enrollmentRecords.find(enroll => enroll.studentId._id.toString() === record.studentId._id.toString());
+        // Guard against null studentId or _id
+        if (!record.studentId || !record.studentId._id) return null;
+        const enrollment = enrollmentRecords.find(enroll => enroll.studentId && enroll.studentId._id && enroll.studentId._id.toString() === record.studentId._id.toString());
 
         return {
           studentId: record.studentId._id,
@@ -479,11 +498,14 @@ export const getInstructorCoursesWithProgress = async (req, res) => {
         };
       });
 
+      // Filter out null entries from studentsProgress
+      const filteredStudentsProgress = studentsProgress.filter(Boolean);
+
       return {
         courseId: course._id,
         title: course.title,
         category: course.category,
-        enrolledStudents: studentsProgress,
+        enrolledStudents: filteredStudentsProgress,
       };
     }));
 
@@ -604,7 +626,7 @@ export const setCourseVisibility = async (req, res) => {
 
 export const getActiveCourses = async (req, res) => {
   try {
-    const courses = await Course.find({ isActive: true })
+    const courses = await Course.find({ isActive: true, published: true })
       .populate("instructor", "name email")
       .lean()
       .exec();

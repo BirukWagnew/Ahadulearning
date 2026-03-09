@@ -97,7 +97,7 @@ const AdminDashboard = () => {
                 {user?.name || "Admin User"}
               </div>
               <div className="text-xs text-muted-foreground">
-                {user?.email || "admin@fidelhub.com"}
+                {user?.email || "admin@ahadulearning.com"}
               </div>
             </div>
           </div>

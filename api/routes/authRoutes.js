@@ -5,8 +5,16 @@ import { protect } from '../middleware/authMiddleware.js'; // Import the JWT pro
 
 const router = express.Router();
 
+// Multer error handler
+const handleMulterError = (err, req, res, next) => {
+  if (err) {
+    return res.status(400).json({ message: err.message });
+  }
+  next();
+};
+
 // Apply the upload middleware to the register route
-router.post('/register', uploadPDF.single('cv'), registerUser); // 'cv' is the name of the file field in the form
+router.post('/register', uploadPDF.single('cv'), handleMulterError, registerUser); // 'cv' is the name of the file field in the form
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
 router.post('/me', protect, getMe); // Changed from GET to POST

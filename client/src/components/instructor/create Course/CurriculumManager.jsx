@@ -72,7 +72,6 @@ const CurriculumManager = ({
           module._id === moduleId ? { ...module, [field]: value } : module
         )
       );
-      toast.success("Module updated successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to update module");
     }
@@ -162,7 +161,6 @@ const CurriculumManager = ({
             : module
         )
       );
-      toast.success("Lesson updated successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to update lesson");
     }

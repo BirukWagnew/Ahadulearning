@@ -5,7 +5,7 @@ dotenv.config();
 
 async function verifyAdmin() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Simple user schema to check admin
@@ -22,7 +22,7 @@ async function verifyAdmin() {
     const User = mongoose.model('UserVerify', userSchema);
 
     // Check admin verification status
-    const admin = await User.findOne({ email: 'admin@fidelhub.com' });
+    const admin = await User.findOne({ email: 'admin@ahadulearning.com' });
     
     if (admin) {
       console.log('✅ Admin user found:');

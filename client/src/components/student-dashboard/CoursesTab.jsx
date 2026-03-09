@@ -146,7 +146,7 @@ export const CoursesTab = () => {
   };
   const handleRedirect = (course, isCompleted) => {
     if (isCompleted) {
-      navigate(`/get-certified/${course._id}/${user._id}`);
+      navigate(`/certificate/${course._id}/${user._id}`);
     } else {
       navigate(`/courses/${course._id}`);
     }

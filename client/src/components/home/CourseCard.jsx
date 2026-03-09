@@ -155,7 +155,7 @@ const CourseCard = ({
                 <BookOpen size={14} className="inline mr-1" /> {totalLessons} lessons
               </div>
               <div className="font-semibold text-slate-900 dark:text-white">
-                {price > 0 ? `${price.toFixed(2)} ETH` : "Free"}
+                {price > 0 ? `${price.toFixed(2)} ETB` : "Free"}
               </div>
             </div>
           </div>

@@ -153,6 +153,7 @@ const useProgress = (studentId, courseId, isEnrolled) => {
 export const CourseProgress = ({ studentId, courseId, course }) => {
   const navigate = useNavigate();
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [hasReviewedOverride, setHasReviewedOverride] = useState(false);
   const { isEnrolled, isLoading: enrollmentLoading, error: enrollmentError } = useEnrollment(studentId, courseId);
   const { progress, isLoading: progressLoading, error: progressError } = useProgress(studentId, courseId, isEnrolled);
 
@@ -315,7 +316,7 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
   const percentage = progress?.progressPercentage || 0;
   const totalCompleted = progress?.completedLessons?.length || 0;
   const total = progress?.totalLessons || 0;
-  const hasReviewed = progress?.hasReviewed || false;
+  const hasReviewed = hasReviewedOverride || progress?.hasReviewed || false;
 
   const handleContinueLearning = () => {
     let nextLesson = null;
@@ -352,6 +353,15 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
     }
   };
 
+  const handleViewCertificate = () => {
+    const resolvedCourseId = (courseId || course?._id || course?.id)?.toString();
+    if (!studentId || !resolvedCourseId) {
+      navigate(`/courses/${courseId}/complete`);
+      return;
+    }
+    navigate(`/certificate/${resolvedCourseId}/${studentId}`);
+  };
+
   const handleReviewSubmit = async (reviewData) => {
     try {
       const token = localStorage.getItem('token');
@@ -366,8 +376,6 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          course: courseId,
-          student: studentId,
           rating: reviewData.rating,
           comment: reviewData.comment
         })
@@ -377,42 +385,48 @@ export const CourseProgress = ({ studentId, courseId, course }) => {
         if (response.status === 401) {
           throw new Error("Please log in to submit a review");
         }
-        throw new Error('Failed to submit review');
+        if (response.status === 409 || response.status === 400) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.message || "You have already submitted a review for this course.");
+        }
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || 'Failed to submit review');
       }
 
-      const updatedProgress = await response.json();
-      setProgressState(prev => ({
-        ...prev,
-        progress: updatedProgress
-      }));
-      
+      await response.json().catch(() => null);
+
+      // Mark as reviewed locally so the button disappears immediately
+      setHasReviewedOverride(true);
       setShowReviewModal(false);
-      toast.success("Review submitted successfully!");
     } catch (error) {
       console.error("Error submitting review:", error);
       toast.error(error.message);
+      throw error;
     }
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 sticky top-4">
-      <h3 className="font-semibold mb-4">Your Progress</h3>
-      <div className="mb-6">
-        <div className="flex justify-between text-sm mb-1">
-          <span>{Math.round(percentage)}% complete</span>
-          <span>
-            {totalCompleted}/{total} lessons
-          </span>
-        </div>
-        <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-fidel-500 rounded-full transition-all duration-300"
-            style={{ width: `${percentage}%` }}
-          ></div>
-        </div>
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+      <h2 className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">
+        Course Progress
+      </h2>
+      <div className="flex items-center text-slate-600 dark:text-slate-400">
+        <span>{Math.round(percentage)}% complete</span>
+        <span>
+          {totalCompleted}/{total} lessons
+        </span>
+      </div>
+      <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-fidel-500 rounded-full transition-all duration-300"
+          style={{ width: `${percentage}%` }}
+        ></div>
       </div>
       
-      <Button className="w-full mb-3" onClick={handleContinueLearning}>
+      <Button
+        className="w-full mb-3"
+        onClick={percentage === 100 ? handleViewCertificate : handleContinueLearning}
+      >
         {percentage === 100 ? "View Certificate" : "Continue Learning"}
       </Button>
 
@@ -490,15 +504,13 @@ const NextLesson = ({ modules, completedLessons = [] }) => {
 };
 
 const CertificationNotice = ({ course, studentId, isCompleted }) => {
-  const navigate = useNavigate();
-
   const handleCertificationClick = () => {
     const resolvedCourseId = (course?._id || course?.id)?.toString();
     if (!studentId || !resolvedCourseId) {
       console.error("Student ID or Course ID is undefined.");
       return;
     }
-    navigate(`/certificate/${resolvedCourseId}/${studentId}`);
+    window.location.href = `/certificate/${resolvedCourseId}/${studentId}`;
   };
 
   return (

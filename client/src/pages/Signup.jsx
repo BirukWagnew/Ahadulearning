@@ -30,14 +30,25 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 const formSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  email: z.string().email("Please enter a valid email"),
-  phone: z.string().min(10, "Phone must be at least 10 digits").optional(),
+  name: z
+    .string()
+    .min(4, "Name must be at least 4 characters")
+    .regex(/^[A-Za-z ]+$/, "Name must contain letters only"),
+  email: z
+    .string()
+    .email("Please enter a valid email")
+    .regex(
+      /^[A-Z0-9._%+-]+@(gmail\.com|hotmail\.com|yahoo\.com)$/i,
+      "Email must be a gmail.com, hotmail.com, or yahoo.com address"
+    ),
+  phone: z.string()
+    .regex(/^(\+251\d{9}|09\d{8}|07\d{8})$/, "Phone number must be in Ethiopian format: +251XXXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX")
+    .optional(),
   role: z.enum(["student", "instructor"]),
   expertise: z.string().optional(),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&\#\-\_\=\+])[A-Za-z\d@$!%*?&\#\-\_\=\+]{8,}$/, "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -136,8 +147,8 @@ const Signup = () => {
 
       toast.success(response.data.message || "Registration successful!");
 
-      console.log("Navigating to /send-otp with registrationData:", values);
-      navigate('/signup/send-otp-Registration', { state: { registrationData: values } });
+      console.log("Navigating to /verify-otp with registrationData:", values);
+      navigate('/signup/verify-otp', { state: { email: values.email, registrationData: values, otpAlreadySent: true } });
     } catch (error) {
       let errorMessage = "An error occurred during registration";
       
@@ -270,10 +281,15 @@ const Signup = () => {
                     type="tel"
                     {...form.register("phone")}
                     className="glass-input pl-10"
-                    placeholder="+1 (123) 456-7890"
+                    placeholder="+2519XXXXXXXX or 09XXXXXXXX or 07XXXXXXXX"
                   />
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
                 </div>
+                {form.formState.errors.phone && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {form.formState.errors.phone.message}
+                  </p>
+                )}
               </div>
 
               {/* Role Selection */}

@@ -45,7 +45,7 @@ const courseSchema = new mongoose.Schema({
   requirements: [String],
   published: {
     type: Boolean,
-    default: false
+    default: true
   },
   embedding: {
     type: [Number],

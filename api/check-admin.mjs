@@ -5,7 +5,7 @@ dotenv.config();
 
 async function checkAdmin() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Simple user schema to check admin
@@ -21,7 +21,7 @@ async function checkAdmin() {
     const User = mongoose.model('UserCheck', userSchema);
 
     // Check if admin exists
-    const admin = await User.findOne({ email: 'admin@fidelhub.com' });
+    const admin = await User.findOne({ email: 'admin@ahadulearning.com' });
     
     if (admin) {
       console.log('✅ Admin user found:');
@@ -32,7 +32,7 @@ async function checkAdmin() {
       console.log('📊 Status:', admin.status);
       console.log('🔐 Password exists:', !!admin.password);
     } else {
-      console.log('❌ No admin user found with email: admin@fidelhub.com');
+      console.log('❌ No admin user found with email: admin@ahadulearning.com');
       
       // List all users to see what exists
       const allUsers = await User.find({});

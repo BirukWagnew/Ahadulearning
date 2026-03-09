@@ -57,6 +57,10 @@ io.on("connection", (socket) => {
     io.emit("onlineUsers", Array.from(onlineUsers));
   });
 
+  socket.on("getOnlineUsers", () => {
+    socket.emit("onlineUsers", Array.from(onlineUsers));
+  });
+
   // Typing indicators
   socket.on("typing", ({ conversationId, userId }) => {
     socket.to(conversationId).emit("userTyping", { conversationId, userId });
@@ -85,9 +89,18 @@ io.on("connection", (socket) => {
     // Optional: delete from DB here if needed
     socket.to(conversationId).emit("messageDeleted", { messageId });
   });
-  socket.on("updateMessage", ({ messageId, newText, conversationId }) => {
-    // Optional: update DB
-    socket.to(conversationId).emit("messageUpdated", { messageId, newText });
+  socket.on("updateMessage", (payload) => {
+    const conversationId = payload?.conversationId;
+    if (!conversationId) return;
+
+    // Frontend may send either:
+    // - { conversationId, messageId, newText }
+    // - { conversationId, _id, text, ... }
+    const updatedMessage = payload?._id
+      ? payload
+      : { _id: payload?.messageId, text: payload?.newText };
+
+    socket.to(conversationId).emit("messageUpdated", updatedMessage);
   });
 
   // Disconnection
@@ -194,9 +207,6 @@ app.get("/", (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Server error", error: err.message });
-});
-io.on("connection", (socket) => {
-  // console.log("User connected:", socket.id);
 });
 const PORT = process.env.PORT || 5000;
 server.on("error", (err) => {

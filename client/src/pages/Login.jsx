@@ -2,7 +2,7 @@ import { useState } from "react";
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ThemeToggle from "@/components/ui/ThemeToggle";
@@ -11,17 +11,33 @@ import { useAuth } from "../context/AuthContext"; // Adjust path as needed
 import axios from "axios";
 import { toast } from "sonner";
 import { useSearchParams } from 'react-router-dom';
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const formSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&\#\-\_\=\+])[A-Za-z\d@$!%*?&\#\-\_\=\+]{8,}$/, "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
+});
 
 const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'); 
 
 const Login = () => {
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const form = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
   // Check for enrollment intent after login
   useEffect(() => {
@@ -48,113 +64,111 @@ const Login = () => {
     }
   }, [searchParams]);
 
-  
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
+  const handleSubmit = async (values) => {
+    setIsLoading(true);
 
-  try {
-    // Use the login function from AuthContext instead of direct axios call
-    const response = await login(email, password);
-    if (!response || !response.token || !response.user) {
-      throw new Error("Invalid login response");
-    }
-
-    // Successful login
-    toast.success("Login Successful! Redirecting to your dashboard...");
-
-    // Store token if using JWT
-    if (response.token) {
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));  //
-    }
-    // if (checkTokenExpiry()) {
-    //   localStorage.removeItem("token");
-    //   navigate("/login");  
-    //   return;
-    // }
-    // Get user details - now from response directly (not response.data)
-    const { role: userRole, isApproved, status, _id} = response.user || {};
-
-    console.log("Login response:", { userRole, isApproved, status });
-
-    socket.emit('userConnected', _id);
-        if (status === "blocked") {
-      toast.error("Your account has been blocked by the admin.");
-      localStorage.removeItem("token"); // Remove token if stored
-      setIsLoading(false);
-      return; 
-    }
-    // Determine redirect path
-    let redirectPath = "/";
-    if (!isApproved) {
-      redirectPath = "/pending-approval";
-    } else {
-      switch (userRole) {
-        case "instructor":
-          redirectPath = "/instructor-dashboard";
-          break;
-        case "admin":
-          redirectPath = "/admin-dashboard";
-          break;
-        case "student":
-          redirectPath = "/student-dashboard";
-          break;
-        default:
-          redirectPath = "/";
+    try {
+      // Use the login function from AuthContext with email
+      const response = await login(values.email, values.password);
+      if (!response || !response.token || !response.user) {
+        throw new Error("Invalid login response");
       }
-    }
 
-    // Navigate without delay since context is already updated
-    navigate(redirectPath, { 
-      replace: true,
-      state: { freshLogin: true }
-    });
+      // Successful login
+      toast.success("Login Successful! Redirecting to your dashboard...");
 
-  } catch (error) {
-    let errorMessage = "Login failed. Please try again.";
-  
-    if (axios.isAxiosError(error)) {
-      if (error.response) {
-        switch (error.response.status) {
-          case 401:
-            errorMessage = "Invalid email or password";
+      // Store token if using JWT
+      if (response.token) {
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));  //
+      }
+      // if (checkTokenExpiry()) {
+      //   localStorage.removeItem("token");
+      //   navigate("/login");  
+      //   return;
+      // }
+      // Get user details - now from response directly (not response.data)
+      const { role: userRole, isApproved, status, _id} = response.user || {};
+
+      console.log("Login response:", { userRole, isApproved, status });
+
+      socket.emit('userConnected', _id);
+      if (status === "blocked") {
+        toast.error("Your account has been blocked by the admin.");
+        localStorage.removeItem("token"); // Remove token if stored
+        setIsLoading(false);
+        return; 
+      }
+      // Determine redirect path
+      let redirectPath = "/";
+      if (!isApproved) {
+        redirectPath = "/pending-approval";
+      } else {
+        switch (userRole) {
+          case "instructor":
+            redirectPath = "/instructor-dashboard";
             break;
-          case 403:
-            const { message } = error.response.data;
-  
-            // Check for blocked or pending approval status in the response message
-            if (message?.includes("blocked")) {
-              errorMessage = "Your account has been blocked by the admin.";
-            } else if (message?.includes("approved")) {
-              errorMessage = "Your account is pending approval by an admin.";
-            } else if (message?.includes("not verified")) {
-              errorMessage = "Account not verified. Please check your email.";
-            } else {
-              errorMessage = message || "Account not verified.";
-            }
+          case "admin":
+            redirectPath = "/admin-dashboard";
             break;
-          case 404:
-            errorMessage = "User not found";
-            break;
-          case 429:
-            errorMessage = "Too many attempts. Please try again later.";
+          case "student":
+            redirectPath = "/student-dashboard";
             break;
           default:
-            errorMessage = error.response.data.message || errorMessage;
+            redirectPath = "/";
         }
-      } else if (error.request) {
-        errorMessage = "No response from server. Please check your connection.";
       }
-    }
+
+      // Navigate without delay since context is already updated
+      navigate(redirectPath, { 
+        replace: true,
+        state: { freshLogin: true }
+      });
+
+    } catch (error) {
+      let errorMessage = "Login failed. Please try again.";
   
-    toast.error(errorMessage);
-    console.error("Login error:", error);
-  }
-   finally {
-    setIsLoading(false);
-  }
-};
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          switch (error.response.status) {
+            case 401:
+              errorMessage = "Invalid email or password";
+              break;
+            case 403:
+              const { message } = error.response.data;
+  
+              // Check for blocked or pending approval status in the response message
+              if (message?.includes("blocked")) {
+                errorMessage = "Your account has been blocked by the admin.";
+              } else if (message?.includes("approved")) {
+                errorMessage = "Your account is pending approval by an admin.";
+              } else if (message?.includes("not verified")) {
+                errorMessage = "Account not verified. Please check your email.";
+              } else {
+                errorMessage = message || "Account not verified.";
+              }
+              break;
+            case 404:
+              errorMessage = "User not found";
+              break;
+            case 429:
+              errorMessage = "Too many attempts. Please try again later.";
+              break;
+            default:
+              errorMessage = error.response.data.message || errorMessage;
+          }
+        } else if (error.request) {
+          errorMessage = "No response from server. Please check your connection.";
+        }
+      }
+  
+      toast.error(errorMessage);
+      console.error("Login error:", error);
+    }
+    finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -182,21 +196,26 @@ const handleSubmit = async (e) => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="glass-card p-6 md:p-8 shadow-lg"
           >
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Email address
+                  Email Address
                 </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="glass-input"
-                  placeholder="your.email@example.com"
-                />
-                
+                <div className="relative">
+                  <Input
+                    id="email"
+                    type="email"
+                    {...form.register("email")}
+                    className="glass-input pl-10"
+                    placeholder="your.email@example.com"
+                  />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
+                </div>
+                {form.formState.errors.email && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {form.formState.errors.email.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -207,9 +226,7 @@ const handleSubmit = async (e) => {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    {...form.register("password")}
                     className="glass-input pr-10"
                     placeholder="••••••••"
                   />
@@ -222,6 +239,14 @@ const handleSubmit = async (e) => {
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+                {form.formState.errors.password && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {form.formState.errors.password.message}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Must contain at least 8 characters with uppercase, lowercase, number, and special character
+                </p>
               </div>
 
               <div className="flex items-center justify-between">

@@ -8,11 +8,11 @@ const User = require('./models/User.js');
 async function createAdminUser() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/fidelhub');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to MongoDB');
 
     // Check if admin user already exists
-    const existingAdmin = await User.findOne({ email: 'admin@fidelhub.com' });
+    const existingAdmin = await User.findOne({ email: 'admin@ahadulearning.com' });
     
     if (existingAdmin) {
       console.log('👤 Admin user already exists:');
@@ -46,7 +46,7 @@ async function createAdminUser() {
       
       const adminUser = new User({
         name: 'System Administrator',
-        email: 'admin@fidelhub.com',
+        email: 'admin@ahadulearning.com',
         role: 'admin',
         password: hashedPassword,
         isApproved: true,
@@ -56,7 +56,7 @@ async function createAdminUser() {
       await adminUser.save();
       
       console.log('✅ Admin user created successfully:');
-      console.log(`   Email: admin@fidelhub.com`);
+      console.log(`   Email: admin@ahadulearning.com`);
       console.log(`   Password: Admin123!@#`);
       console.log(`   Role: admin`);
       console.log(`   Status: active`);

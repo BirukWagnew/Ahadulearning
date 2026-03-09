@@ -50,7 +50,7 @@ const drawConsolidatedTable = (doc, sections, startX, startY) => {
 export const initiatePayment = async (req, res) => {
   const { amount, email, fullName, courseId } = req.body;
   const studentId = req.user?._id; // Grab from authenticated user
-  const tx_ref = `FIDELHUB-${Date.now()}`;
+  const tx_ref = `AHADU-${Date.now()}`;
 
   if (!studentId) {
     return res.status(401).json({ error: 'Unauthorized. Student ID missing.' });
@@ -112,7 +112,7 @@ export const initiatePayment = async (req, res) => {
         // callback_url: `${process.env.FRONTEND_URL}/api/payments/webhook`,
         return_url: `${process.env.FRONTEND_URL}/payment-success?course=${courseId}&tx_ref=${tx_ref}`,
         customization: {
-          title: 'FidelHub Payment',
+          title: 'Ahadu Learning',
           description: 'Payment for Course Enrollment',
         },
       },
@@ -432,7 +432,7 @@ export const generateReceipt = async (req, res) => {
       margin: 40,
       info: {
         Title: `Payment Receipt - ${tx_ref}`,
-        Author: 'Your Institution Name',
+        Author: 'Ahadu Learning',
       },
     });
 
@@ -450,18 +450,11 @@ export const generateReceipt = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=Payment-Receipt-${tx_ref}.pdf`);
     doc.pipe(res);
 
-    // Header with logo
-    try {
-      const logoPath = path.join(__dirname, '../../../client/src/assets/logo.png');
-      doc.image(logoPath, 50, 40, { width: 80 });
-      doc.fontSize(20)
-         .fillColor('#2C3E50')
-         .text('PAYMENT RECEIPT', 150, 60);
-    } catch (logoError) {
-      doc.fontSize(20)
-         .fillColor('#2C3E50')
-         .text('YOUR INSTITUTION', 50, 50);
-    }
+    // Header with Ahadu Learning text (no logo)
+    doc.fontSize(20)
+       .fillColor('#2C3E50')
+       .text('Ahadu Learning', 50, 50)
+       .text('PAYMENT RECEIPT', 50, 80);
 
     doc.fontSize(10)
        .fillColor('#7f8c8d')

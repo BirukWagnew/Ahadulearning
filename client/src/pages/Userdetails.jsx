@@ -26,6 +26,8 @@ import { Separator } from "@/components/ui/separator";
 import UserAvatar from "@/components/layout/UserAvatar";
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const UserDetail = ({ userId, onBack, embedded = false }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/${userId}`,
+          `${API_BASE_URL}/api/admin/${userId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -55,18 +57,60 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
     fetchUserData();
   }, [userId]);
 
-  const handleDownload = (fileUrl) => {
-    const filePath = `${import.meta.env.VITE_API_BASE_URL}/uploads/cvs/${fileUrl
-      .split(/[\\/]/)
-      .pop()}`;
-    const newWindow = window.open(filePath, "_blank", "width=800,height=600");
-    if (!newWindow) {
-      toast.error(
-        "Failed to open the file. Please disable your pop-up blocker."
-      );
+  const handleDownload = async (fileUrl) => {
+    if (!fileUrl) {
+      toast.error("No file available to download");
       return;
     }
-    toast.success("File opened in a new window");
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+      // The DB stores something like: "uploads\\cvs\\user-xxx.pdf"
+      // Server serves it via: /uploads/cvs/user-xxx.pdf
+      const normalized = String(fileUrl).replace(/\\/g, "/");
+
+      let relativePath = normalized;
+      if (relativePath.startsWith("/")) relativePath = relativePath.slice(1);
+
+      // If only a filename was stored, assume it lives in /uploads/cvs
+      if (!relativePath.includes("/")) {
+        relativePath = `uploads/cvs/${relativePath}`;
+      }
+
+      const filePath = `${baseUrl}/${relativePath}`;
+
+      const filename = relativePath.split("/").pop();
+
+      // Fetch the file
+      // NOTE: /uploads is served as a static public route. Adding Authorization
+      // headers triggers a CORS preflight that may be blocked by the server.
+      const response = await fetch(filePath);
+
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+
+      // Convert to blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      // Create temporary anchor element for download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("CV downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading CV:", error);
+      toast.error(`Failed to download CV: ${error.message}`);
+    }
   };
 
   const handleApproveUser = async (userId) => {
@@ -78,9 +122,7 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
       }
 
       await axios.put(
-        `${
-          import.meta.env.VITE_API_BASE_URL
-        }/api/admin/approve-instructor/${userId}`,
+        `${API_BASE_URL}/api/admin/approve-instructor/${userId}`,
         {},
         {
           headers: {
@@ -89,14 +131,24 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
         }
       );
 
-      setUserData((prev) => ({ ...prev, status: "active" }));
+      setUserData((prev) => ({ ...prev, status: "active", isApproved: true }));
       toast.success(`User #${userId} has been approved`);
+
+      // Refetch to ensure UI matches backend state
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/admin/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserData(response.data?.user || response.data);
+      } catch (e) {
+        // Ignore refetch failure; UI was already updated optimistically
+      }
     } catch (error) {
       console.error(
         `Error approving User #${userId}:`,
         error.response?.data || error.message
       );
-      toast.error(`Failed to approve User #${userId}`);
+      toast.error(error.response?.data?.message || `Failed to approve User #${userId}`);
     }
   };
 
@@ -115,9 +167,7 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
       }
 
       await axios.delete(
-        `${
-          import.meta.env.VITE_API_BASE_URL
-        }/api/admin/reject-instructor/${userId}`,
+        `${API_BASE_URL}/api/admin/reject-instructor/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -125,14 +175,24 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
         }
       );
 
-      setUserData((prev) => ({ ...prev, status: "blocked" }));
+      setUserData((prev) => ({ ...prev, status: "blocked", isApproved: false }));
       toast.success(`User #${userId} has been rejected`);
+
+      // Refetch to ensure UI matches backend state
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/admin/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserData(response.data?.user || response.data);
+      } catch (e) {
+        // Ignore refetch failure; UI was already updated optimistically
+      }
     } catch (error) {
       console.error(
         "Error rejecting user:",
         error.response?.data || error.message
       );
-      toast.error("Failed to reject user");
+      toast.error(error.response?.data?.message || "Failed to reject user");
     }
   };
 
@@ -144,7 +204,7 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
         return;
       }
 
-      const blockUrl = `${import.meta.env.VITE_API_BASE_URL}/api/admin/block/${userId}`;
+      const blockUrl = `${API_BASE_URL}/api/admin/block/${userId}`;
       console.log("🔒 Blocking user at URL:", blockUrl);
       console.log("🔒 User ID:", userId);
 
@@ -178,7 +238,7 @@ const UserDetail = ({ userId, onBack, embedded = false }) => {
         return;
       }
 
-      const unblockUrl = `${import.meta.env.VITE_API_BASE_URL}/api/admin/unblock/${userId}`;
+      const unblockUrl = `${API_BASE_URL}/api/admin/unblock/${userId}`;
       console.log("🔓 Unblocking user at URL:", unblockUrl);
       console.log("🔓 User ID:", userId);
 

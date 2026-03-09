@@ -6,7 +6,7 @@ dotenv.config();
 
 async function createGmailAdmin() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Simple user schema for admin creation
@@ -28,7 +28,7 @@ async function createGmailAdmin() {
     
     const admin = new User({
       name: 'Gmail Administrator',
-      email: 'fidelhub.admin@gmail.com',
+      email: 'ahadulearning.admin@gmail.com',
       role: 'admin',
       password: hashedPassword,
       isApproved: true,
@@ -39,12 +39,12 @@ async function createGmailAdmin() {
     await admin.save();
     
     console.log('✅ Gmail admin user created successfully!');
-    console.log('📧 Email: fidelhub.admin@gmail.com');
+    console.log('📧 Email: ahadulearning.admin@gmail.com');
     console.log('🔑 Password: GmailAdmin789!@#');
     console.log('🌐 URL: http://localhost:5173/admin-dashboard');
     
     console.log('\n📝 Instructions:');
-    console.log('1. Create a Gmail account: fidelhub.admin@gmail.com');
+    console.log('1. Create a Gmail account: ahadulearning.admin@gmail.com');
     console.log('2. Use the password: GmailAdmin789!@#');
     console.log('3. Login to admin dashboard with these credentials');
     console.log('4. You can then approve instructor applications');

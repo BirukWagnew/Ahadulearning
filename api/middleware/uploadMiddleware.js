@@ -27,6 +27,10 @@ const storage = (folder) =>
 
 // File filters
 const pdfFilter = (req, file, cb) => {
+  // Allow requests without a file (for student registration)
+  if (!file) {
+    return cb(null, true);
+  }
   if (file.mimetype !== 'application/pdf') {
     return cb(new Error('Only PDF files are allowed.'));
   }

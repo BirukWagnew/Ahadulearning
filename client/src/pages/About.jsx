@@ -172,7 +172,7 @@ function About() {
               {
                 name: "Biruk Wagnew",
                 role: "Founder & CEO",
-                bio: "Biruk has over 15 years of experience in education and technology, with a passion for expanding educational access across Ethiopia.",
+                bio: "Biruk has over 3 years of experience in education and technology, with a passion for expanding educational access across Ethiopia.",
                 avatar: "BW",
               },
               {

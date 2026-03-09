@@ -71,7 +71,7 @@ echo.
 echo 📝 Step 12: Test admin login...
 curl -s -X POST http://localhost:5000/api/auth/login ^
   -H "Content-Type: application/json" ^
-  -d "{\"email\":\"admin@fidelhub.com\",\"password\":\"Admin123!@#\"}" > admin_token.txt
+  -d "{\"email\":\"admin@ahadulearning.com\",\"password\":\"Admin123!@#\"}" > admin_token.txt
 
 echo.
 echo 📝 Step 13: Extract admin token...

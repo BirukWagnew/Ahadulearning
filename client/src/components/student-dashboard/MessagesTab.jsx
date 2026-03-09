@@ -18,7 +18,9 @@ import { useSocket } from "../../context/SocketContext";
 export const MessagesTab = () => {
   const { user } = useAuth();
   const socket = useSocket();
+  const userId = user?._id;
   const [conversations, setConversations] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [newMessage, setNewMessage] = useState("");
@@ -29,24 +31,47 @@ export const MessagesTab = () => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editedMessageText, setEditedMessageText] = useState("");
+  const [isUserLoading, setIsUserLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-const handleNewMessage = (message) => {
-  console.log("Received new message via socket:", message);
-  if (message.conversationId === selectedConversation._id) {
-    setMessages((prev) => [...prev, message]);
-  }
-};
+  const API_URL =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:5000";
+
+  // Stabilize userId to avoid flicker during auth load
+  useEffect(() => {
+    if (userId) {
+      setIsUserLoading(false);
+    } else {
+      const t = setTimeout(() => setIsUserLoading(false), 600000); // 10 minutes
+      return () => clearTimeout(t);
+    }
+  }, [userId]);
+
+  // Keep online users updated globally (not only when a conversation is selected)
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOnlineUsers = (users) => {
+      setOnlineUsers(users);
+    };
+
+    socket.on("onlineUsers", handleOnlineUsers);
+    return () => {
+      socket.off("onlineUsers", handleOnlineUsers);
+    };
+  }, [socket]);
 
   // Fetch conversations
   useEffect(() => {
     const fetchConversations = async () => {
       try {
         setIsLoading(true);
+
         const response = await axios.get(
-          `${API_URL}/api/chat/conversations/?userId=${user._id}`,
+          `${API_URL}/api/chat/conversations/?userId=${userId}`,
           {
             withCredentials: true,
             headers: {
@@ -54,9 +79,10 @@ const handleNewMessage = (message) => {
             },
           }
         );
-        setConversations(response.data);
-        if (response.data.length > 0 && !selectedConversation) {
-          setSelectedConversation(response.data[0]);
+        const nextConversations = Array.isArray(response.data) ? response.data : [];
+        setConversations(nextConversations);
+        if (nextConversations.length > 0 && !selectedConversation) {
+          setSelectedConversation(nextConversations[0]);
         }
       } catch (error) {
         console.error("Error fetching conversations:", error);
@@ -65,8 +91,31 @@ const handleNewMessage = (message) => {
       }
     };
 
-    if (user) fetchConversations();
-  }, [user]);
+    if (userId) fetchConversations();
+  }, [userId]);
+
+  // Fetch contacts (accounts you can message) - used when there are no conversations yet
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const response = await axios.get(
+          `${API_URL}/api/chat/contacts?userId=${userId}`,
+          {
+            withCredentials: true,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        setContacts(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Error fetching chat contacts:", error);
+        setContacts([]);
+      }
+    };
+
+    if (userId) fetchContacts();
+  }, [userId, API_URL]);
 
   // Fetch messages
   useEffect(() => {
@@ -105,15 +154,19 @@ const handleNewMessage = (message) => {
 
     const handleNewMessage = (message) => {
       if (message.conversationId === selectedConversation._id) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          if (message?._id && prev.some((m) => m._id === message._id)) return prev;
+          return [...prev, message];
+        });
       }
     };
 
     const handleMessageUpdated = (updatedMessage) => {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === updatedMessage._id ? updatedMessage : msg
-        )
+        prev.map((msg) => {
+          if (msg._id !== updatedMessage._id) return msg;
+          return { ...msg, ...updatedMessage };
+        })
       );
     };
 
@@ -121,25 +174,26 @@ const handleNewMessage = (message) => {
       setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
     };
 
-    const handleOnlineUsers = (users) => {
-      setOnlineUsers(users);
-    };
-
     socket.on("newMessage", handleNewMessage);
     socket.on("messageUpdated", handleMessageUpdated);
     socket.on("messageDeleted", handleMessageDeleted);
-    socket.on("onlineUsers", handleOnlineUsers);
     socket.emit("joinConversation", selectedConversation._id);
-    socket.emit("getOnlineUsers");
 
     return () => {
       socket.off("newMessage", handleNewMessage);
       socket.off("messageUpdated", handleMessageUpdated);
       socket.off("messageDeleted", handleMessageDeleted);
-      socket.off("onlineUsers", handleOnlineUsers);
       socket.emit("leaveConversation", selectedConversation._id);
     };
   }, [socket, selectedConversation]);
+
+  // Register current user as online + request online users list
+  useEffect(() => {
+    if (!socket || !userId) return;
+
+    socket.emit("userOnline", userId);
+    socket.emit("getOnlineUsers");
+  }, [socket, userId]);
 
   const handleSendMessage = async () => {
     console.log('🔍 handleSendMessage called');
@@ -147,16 +201,16 @@ const handleNewMessage = (message) => {
     console.log('🔍 file:', file);
     console.log('🔍 isSending:', isSending);
     console.log('🔍 selectedConversation:', selectedConversation);
-    
+
     if ((!newMessage.trim() && !file) || isSending) return;
-    
+
     console.log('🔍 Validation passed, sending message...');
 
     try {
       setIsSending(true);
       const formData = new FormData();
       formData.append("conversationId", selectedConversation._id);
-      formData.append("senderId", user._id);
+      formData.append("senderId", userId);
       formData.append("text", newMessage);
       if (file) formData.append("file", file);
 
@@ -176,7 +230,11 @@ const handleNewMessage = (message) => {
 
       console.log('🔍 API Response:', response.data);
 
-      // setMessages((prev) => [...prev, response.data]);
+      // Optimistically add (socket handler also dedupes)
+      setMessages((prev) => {
+        if (response.data?._id && prev.some((m) => m._id === response.data._id)) return prev;
+        return [...prev, response.data];
+      });
       setNewMessage("");
       setFile(null);
 
@@ -204,9 +262,6 @@ const handleNewMessage = (message) => {
     setEditingMessageId(message._id);
     setEditedMessageText(message.text);
   };
-const handleEdit = (messageId, newText) => {
-  socket.emit("updateMessage", { messageId, newText, conversationId });
-};
 
   const handleCancelEdit = () => {
     setEditingMessageId(null);
@@ -297,19 +352,74 @@ const handleEdit = (messageId, newText) => {
       console.error("Error deleting message:", error);
     }
   };
-  
 
   const isUserOnline = (userId) => {
-    return onlineUsers.some((user) => user._id === userId);
+    return onlineUsers.some((u) => (typeof u === "string" ? u === userId : u?._id === userId));
   };
 
   const getOtherParticipant = (conversation) =>
-    conversation.members.find((member) => member._id !== user._id);
+    (conversation?.members || []).find((member) => member._id !== userId) ||
+    conversation?.instructor ||
+    null;
+
+  const handleStartConversation = async (contact) => {
+    try {
+      // If conversation already exists with that user, open it
+      const existing = conversations.find((conv) =>
+        (conv.members || []).some((m) => String(m._id) === String(contact.user._id))
+      );
+      if (existing) {
+        setSelectedConversation(existing);
+        return;
+      }
+
+      const instructorId =
+        user.role === "student" ? contact.user._id : userId;
+      const studentId = user.role === "student" ? userId : contact.user._id;
+
+      const response = await axios.post(
+        `${API_URL}/api/chat/conversations`,
+        {
+          studentId,
+          instructorId,
+          courseId: contact.courseId,
+        },
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const created = response.data;
+      // Fetch updated conversations so sidebar shows it with members populated
+      const convRes = await axios.get(
+        `${API_URL}/api/chat/conversations/?userId=${userId}`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      setConversations(Array.isArray(convRes.data) ? convRes.data : []);
+
+      const createdFull = convRes.data.find((c) => c._id === created._id) || created;
+      setSelectedConversation(createdFull);
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+    }
+  };
 
   const filteredConversations = conversations.filter((conv) => {
     const otherUser = getOtherParticipant(conv);
     return otherUser?.name?.toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  const filteredContacts = contacts.filter((c) =>
+    c?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const renderFilePreview = (message) => {
     if (!message.fileUrl) return null;
@@ -374,10 +484,18 @@ const handleEdit = (messageId, newText) => {
         return <ImageIcon size={18} />;
       case "video":
         return <VideoIcon size={18} />;
-      default:
         return <FileText size={18} />;
     }
   };
+
+  // Early return after all hooks to avoid React crashes
+  if (isUserLoading || !userId) {
+    return (
+      <div className="flex h-full items-center justify-center text-slate-500 dark:text-slate-400">
+        Loading messages...
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -418,7 +536,7 @@ const handleEdit = (messageId, newText) => {
               <Loader2 className="animate-spin" />
             </div>
           ) : (
-            filteredConversations.map((conversation) => {
+            (filteredConversations.length ? filteredConversations : []).map((conversation) => {
               const otherUser = getOtherParticipant(conversation);
               const lastMessage = conversation.lastMessage;
               const isOnline = isUserOnline(otherUser?._id);
@@ -497,6 +615,53 @@ const handleEdit = (messageId, newText) => {
               );
             })
           )}
+
+          {!isLoading && filteredConversations.length === 0 && filteredContacts.length > 0 && (
+            <div className="border-t border-slate-200 dark:border-slate-700">
+              <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Contacts
+                </h3>
+              </div>
+              {filteredContacts.map((contact) => {
+                const isOnline = isUserOnline(contact?.user?._id);
+                return (
+                  <div
+                    key={`${contact.user._id}-${contact.courseId}`}
+                    className={cn(
+                      "p-3 flex items-start hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition-colors duration-200"
+                    )}
+                    onClick={() => handleStartConversation(contact)}
+                  >
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center text-sm font-medium">
+                        {contact.user?.name
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </div>
+                      {isOnline && (
+                        <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-800" />
+                      )}
+                    </div>
+                    <div className="ml-3 flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                        {contact.user?.name}
+                      </h4>
+                      <p className="text-xs mt-1 truncate text-slate-500 dark:text-slate-400">
+                        Start a new conversation
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!isLoading && filteredConversations.length === 0 && filteredContacts.length === 0 && (
+            <div className="p-4 text-sm text-slate-500 dark:text-slate-400">
+              No conversations yet.
+            </div>
+          )}
         </div>
 
         {/* Messages Area */}
@@ -539,12 +704,14 @@ const handleEdit = (messageId, newText) => {
                   </div>
                 ) : (
                   <div className="flex flex-col space-y-3">
-                    {messages.map((msg) => (
+                    {messages.filter(msg => msg && (msg.sender?._id || msg.sender)).map((msg) => {
+                      const senderId = msg.sender?._id || msg.sender;
+                      return (
                       <div
                         key={msg._id}
                         className={cn(
                           "flex flex-col",
-                          (msg.sender._id || msg.sender) === user._id
+                          senderId === userId
                             ? "items-end"
                             : "items-start"
                         )}
@@ -552,7 +719,7 @@ const handleEdit = (messageId, newText) => {
                         <div
                           className={cn(
                             "max-w-[70%] px-4 py-2 rounded-lg",
-                            (msg.sender._id || msg.sender) === user._id
+                            senderId === userId
                               ? "bg-fidel-500 text-white rounded-tr-none"
                               : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white rounded-tl-none"
                           )}
@@ -602,13 +769,12 @@ const handleEdit = (messageId, newText) => {
                         </div>
 
                         {/* Edit/Delete Buttons (only for owner) */}
-                        {(msg.sender._id || msg.sender) === user._id &&
+                        {(msg.sender._id || msg.sender) === userId &&
                           !editingMessageId && (
                             <div className="flex gap-2 mt-1">
                               <button
                                 onClick={() => handleEditMessage(msg)}
                                 className="text-slate-500 hover:text-fidel-500 transition-colors"
-                                title="Edit"
                               >
                                 <Edit size={14} />
                               </button>
@@ -622,12 +788,12 @@ const handleEdit = (messageId, newText) => {
                             </div>
                           )}
                       </div>
-                    ))}
+                    );
+                    })}
                     <div ref={messagesEndRef} />
                   </div>
                 )}
               </div>
-
               {/* Message Input */}
               <div className="p-4 border-t border-slate-200 dark:border-slate-700">
                 {file && (

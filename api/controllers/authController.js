@@ -71,7 +71,7 @@ import { sendTextBeltOTP } from '../services/textBeltService.js';
         
         <div style="text-align: center; color: #999; font-size: 12px;">
           <p>If you didn't request this code, please ignore this email.</p>
-          <p> 2024 FidelHub. All rights reserved.</p>
+          <p> 2024 ahadulearning. All rights reserved.</p>
         </div>
       </div>
     `;
@@ -79,7 +79,8 @@ import { sendTextBeltOTP } from '../services/textBeltService.js';
     await sendEmail(email, emailSubject, emailContent);
     
     res.status(201).json({ 
-      message: 'Registration successful! Please check your email for the OTP verification code.' 
+      message: 'Registration successful! Please check your email for the OTP verification code.',
+      otpSent: true,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -88,13 +89,18 @@ import { sendTextBeltOTP } from '../services/textBeltService.js';
 
 
 export const loginUser = async (req, res) => {
-  const { email, password, otp } = req.body;  
-
-   
+  const { email, phone, password, otp } = req.body;  
 
   try {
-    const user = await User.findOne({ email });
-     
+    // Find user by email or phone
+    let user;
+    if (email) {
+      user = await User.findOne({ email });
+    } else if (phone) {
+      user = await User.findOne({ phone });
+    } else {
+      return res.status(400).json({ message: "Email or phone number is required" });
+    }
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -104,7 +110,7 @@ export const loginUser = async (req, res) => {
      
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     if (user.blocked) {

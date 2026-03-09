@@ -32,6 +32,15 @@ const Courses = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const token = localStorage.getItem("token");
 
+  const normalizeCategory = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/\s+/g, "-");
+
+  const normalizeLevel = (value) => String(value || "").trim().toLowerCase();
+
   useEffect(() => {
     window.scrollTo(0, 0);
     fetchCourses();
@@ -127,9 +136,11 @@ const Courses = () => {
           ? course.instructor.name.toLowerCase().includes(searchQuery.toLowerCase())
           : course.instructor.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory =
-        selectedCategory === "All" || course.category === selectedCategory;
+        selectedCategory === "All" ||
+        normalizeCategory(course.category) === normalizeCategory(selectedCategory);
       const matchesLevel =
-        selectedLevel === "All Levels" || course.level === selectedLevel;
+        selectedLevel === "All Levels" ||
+        normalizeLevel(course.level) === normalizeLevel(selectedLevel);
 
       return matchesSearch && matchesCategory && matchesLevel;
     })

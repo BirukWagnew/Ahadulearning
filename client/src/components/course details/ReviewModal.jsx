@@ -30,7 +30,7 @@ export const ReviewModal = ({ isOpen, onClose, onSubmit, courseTitle }) => {
       if (err.message.includes("401")) {
         setError("Please log in to submit a review");
       } else if (err.message.includes("400")) {
-        setError("Invalid review data");
+        setError(err.message); // Display the provided error message from caller
       } else {
         setError(err.message || "Failed to submit review");
       }

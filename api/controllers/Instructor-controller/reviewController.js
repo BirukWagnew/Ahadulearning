@@ -26,6 +26,9 @@ export const submitReview = async (req, res) => {
 
     res.status(201).json(review);
   } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: 'You have already submitted a review for this course.' });
+    }
     res.status(500).json({ message: 'Error submitting review.', error: err.message });
   }
 };

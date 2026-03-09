@@ -5,7 +5,7 @@ dotenv.config();
 
 async function restoreDeletedAccounts() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Simple user schema to access users
@@ -83,7 +83,7 @@ async function restoreDeletedAccounts() {
       },
       {
         name: 'System Administrator',
-        email: 'admin@fidelhub.com',
+        email: 'admin@ahadulearning.com',
         role: 'admin',
         isApproved: true,
         status: 'active',
@@ -105,7 +105,7 @@ async function restoreDeletedAccounts() {
       },
       {
         name: 'Secondary Administrator',
-        email: 'admin2@fidelhub.com',
+        email: 'admin2@ahadulearning.com',
         role: 'admin',
         isApproved: true,
         status: 'active',
@@ -127,7 +127,7 @@ async function restoreDeletedAccounts() {
       },
       {
         name: 'Gmail Administrator',
-        email: 'fidelhub.admin@gmail.com',
+        email: 'ahadulearning.admin@gmail.com',
         role: 'admin',
         isApproved: true,
         status: 'active',

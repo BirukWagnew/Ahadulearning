@@ -44,7 +44,7 @@ const PaymentFailed = () => {
         </div>
 
         <p className="text-sm text-gray-500 mt-6">
-          Need help? Contact our support at support@fidelhub.com
+          Need help? Contact our support at support@ahadulearning.com
         </p>
       </div>
     </div>

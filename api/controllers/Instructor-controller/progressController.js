@@ -104,18 +104,8 @@ export const getCompletedLessons = async (req, res) => {
     console.log('Progress found:', !!progress);
 
     if (!progress) {
-      console.log('Progress not found, checking all progress records...');
-      const allProgress = await Progress.find({});
-      console.log('Total progress records:', allProgress.length);
-      
-      if (allProgress.length > 0) {
-        console.log('Available progress records:');
-        allProgress.forEach((p, index) => {
-          console.log(`${index + 1}. Student: ${p.studentId}, Course: ${p.courseId}`);
-        });
-      }
-      
-      return res.status(404).json({ error: 'Progress not found for this student and course' });
+      // Return empty completed lessons instead of 404
+      return res.json({ completedLessons: [] });
     }
 
     // Return completed lessons
@@ -150,7 +140,13 @@ export const getProgressData = async (req, res) => {
     });
 
     if (!progress) {
-      return res.status(404).json({ error: 'Progress not found for this student and course' });
+      // Return default progress instead of 404
+      return res.json({
+        completedLessons: [],
+        totalLessons: 0,
+        progressPercentage: 0,
+        lastAccessed: null
+      });
     }
 
     res.json({
@@ -186,9 +182,9 @@ export const getAllStudentsProgress = async (req, res) => {
       .populate('studentId', 'name')  // Populate studentId with name field
       .exec();
 
-    // If no progress data is found
+    // If no progress data is found, return empty array instead of 404
     if (!progressData?.length) {
-      return res.status(404).json({ error: 'No progress data found for this course' });
+      return res.json([]);
     }
 
     // Prepare the response data
@@ -237,7 +233,12 @@ export const getCourseProgressSummary = async (req, res) => {
 
     if (progressRecords.length === 0) {
       console.log('No progress records found for courseId:', courseId); 
-      return res.status(404).json({ message: 'No progress records found' });
+      // Return default summary instead of 404
+      return res.json({
+        course: course.title,
+        students: 0,
+        averageProgress: '0.00%',
+      });
     }
 
     const totalProgress = progressRecords.reduce(

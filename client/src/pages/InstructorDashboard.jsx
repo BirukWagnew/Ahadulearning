@@ -16,6 +16,8 @@ import axios from "axios";
 import InstructorAnalyticsDashboard from "../components/instructor/analytics/InstructorAnalyticsDashboard";
 import { MessagesTab } from "@/components/student-dashboard/MessagesTab";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const InstructorDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mainTab, setMainTab] = useState("overview");
@@ -57,7 +59,7 @@ const InstructorDashboard = () => {
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
       // Fetch courses
-      const coursesUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/courses/instructor/${user._id}/courses`;
+      const coursesUrl = `${API_BASE_URL}/api/courses/instructor/${user._id}/courses`;
       const response = await axios.post(coursesUrl, {}, { signal, headers: authHeaders });
 
       console.log("[DEBUG] Courses response:", {
@@ -69,12 +71,15 @@ const InstructorDashboard = () => {
         throw new Error("Invalid courses data format");
       }
 
+      // Defensive: hide deactivated courses even if API returns them
+      const visibleCourses = response.data.filter((c) => c?.isActive !== false);
+
       // Fetch stats for each course
       setLoading((prev) => ({ ...prev, courses: false, stats: true }));
 
       const coursesWithStats = await Promise.all(
-        response.data.map(async (course) => {
-          const statsUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/courses/${user._id}/course/${course._id}/average-progress`;
+        visibleCourses.map(async (course) => {
+          const statsUrl = `${API_BASE_URL}/api/courses/${user._id}/course/${course._id}/average-progress`;
           try {
             const statsResponse = await axios.post(statsUrl, {}, { signal, headers: authHeaders });
             return {

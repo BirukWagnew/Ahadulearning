@@ -41,12 +41,16 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (email, password) => {
+  const login = async (phoneOrEmail, password) => {
     setLoading(true);
     try {
+      // Check if the input is a phone number (Ethiopian formats) or email
+      const isPhone = /^(\+251\d{9}|09\d{8}|07\d{8})$/.test(phoneOrEmail);
+      const payload = isPhone ? { phone: phoneOrEmail, password } : { email: phoneOrEmail, password };
+      
       const res = await axios.post(
         `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/login`,
-        { email, password },
+        payload,
         { withCredentials: true }
       );
       console.log('🔍 AuthContext Login - Full response:', res.data);

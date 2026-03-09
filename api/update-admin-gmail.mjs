@@ -6,7 +6,7 @@ dotenv.config();
 
 async function updateAdminToGmail() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Simple user schema for admin update

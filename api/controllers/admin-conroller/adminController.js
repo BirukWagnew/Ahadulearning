@@ -417,7 +417,11 @@ export const getPaymentTransactions = async (req, res) => {
   try {
     const payments = await Payment.find()
       .populate('studentId', 'name email')
-      .populate('courseId', 'title')
+      .populate({
+        path: 'courseId',
+        select: 'title instructor',
+        populate: { path: 'instructor', select: 'name email' },
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -622,21 +626,23 @@ export const getCourseStudents = async (req, res) => {
       .populate('studentId', 'name email');
 
     // Transform the data to match expected format with progress
-    const students = enrollments.map(enrollment => {
-      const progress = progressRecords.find(p => 
-        p.studentId._id.toString() === enrollment.studentId._id.toString()
-      );
-      
-      return {
-        _id: enrollment.studentId._id,
-        name: enrollment.studentId.name,
-        email: enrollment.studentId.email,
-        enrolledAt: enrollment.enrolledAt,
-        progress: progress ? progress.progressPercentage : 0,
-        status: enrollment.status || 'active',
-        completedLessons: progress ? progress.completedLessons : []
-      };
-    });
+    const students = enrollments
+      .filter(enrollment => enrollment.studentId) // Filter out null studentIds
+      .map(enrollment => {
+        const progress = progressRecords.find(p => 
+          p.studentId && p.studentId._id.toString() === enrollment.studentId._id.toString()
+        );
+        
+        return {
+          _id: enrollment.studentId._id,
+          name: enrollment.studentId.name,
+          email: enrollment.studentId.email,
+          enrolledAt: enrollment.enrolledAt,
+          progress: progress ? progress.progressPercentage : 0,
+          status: enrollment.status || 'active',
+          completedLessons: progress ? progress.completedLessons : []
+        };
+      });
 
     res.status(200).json({
       success: true,

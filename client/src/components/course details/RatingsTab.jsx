@@ -15,6 +15,9 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
   const [error, setError] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [expandedComments, setExpandedComments] = useState({});
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
   // Calculate rating distribution
   const ratingDistribution = Array(5).fill(0);
@@ -38,9 +41,10 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`http://localhost:5000/api/review/${courseId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/review/${courseId}`, {
           credentials: "include",
         });
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -51,6 +55,14 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
           .slice(0, 5);
         setReviews(sortedReviews);
         setReviewStats(data.reviewStats || { totalReviews: 0, avgRating: "0.0" });
+        if (data.alreadyReviewed) {
+          setAlreadyReviewed(true);
+        } else if (user?._id) {
+          const userHasReviewed = (data.reviews || []).some(
+            (r) => String(r?.student?._id || r?.student) === String(user._id)
+          );
+          setAlreadyReviewed(userHasReviewed);
+        }
       } catch (error) {
         console.error("[RatingsTab] Failed to fetch reviews:", error);
         setError("Failed to load reviews. Please try again later.");
@@ -60,7 +72,7 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
       }
     };
     fetchReviews();
-  }, [courseId]);
+  }, [courseId, user?._id]);
 
   // Handle review submission
   const handleSubmitReview = async ({ rating, comment }) => {
@@ -68,20 +80,32 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
       throw new Error("401: User not authenticated");
     }
     try {
-      const response = await fetch(`http://localhost:5000/api/review/${courseId}`, {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("401: User not authenticated");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/review/${courseId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         credentials: "include",
         body: JSON.stringify({
           rating,
           comment,
-          studentId: user._id,
         }),
       });
       if (!response.ok) {
+        if (response.status === 400) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.message || "400: You have already submitted a review for this course.");
+        }
         throw new Error(`${response.status}: Failed to submit review`);
       }
       const newReview = await response.json();
+
       setReviews((prev) => {
         const updatedReviews = [
           {
@@ -103,6 +127,7 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
         ).toFixed(1),
       }));
       toast.success("Review submitted successfully!");
+      setIsReviewModalOpen(false);
     } catch (error) {
       throw error; // Handled by ReviewModal
     }
@@ -320,13 +345,23 @@ export const RatingsTab = ({ courseId, courseTitle }) => {
               </div>
 
               {/* Review Button */}
-              {/* <Button
-                onClick={() => setIsReviewModalOpen(true)}
+              <Button
+                onClick={() => {
+                  if (!user?._id) {
+                    toast.error("Please log in to submit a review");
+                    return;
+                  }
+                  if (alreadyReviewed) {
+                    toast.error("You have already submitted a review for this course.");
+                    return;
+                  }
+                  setIsReviewModalOpen(true);
+                }}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={!user}
+                disabled={!user?._id || alreadyReviewed}
               >
-                Write a Review
-              </Button> */}
+                {alreadyReviewed ? "Review Submitted" : "Write a Review"}
+              </Button>
             </motion.div>
           </div>
         </div>

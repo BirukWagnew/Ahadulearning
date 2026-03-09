@@ -6,7 +6,7 @@ dotenv.config();
 
 async function createSecondAdmin() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/fidelhub');
+    await mongoose.connect('mongodb://localhost:27017/ahadulearning');
     console.log('✅ Connected to database');
 
     // Simple user schema for admin creation
@@ -23,7 +23,7 @@ async function createSecondAdmin() {
     const User = mongoose.model('SecondAdmin', userSchema);
 
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'admin2@fidelhub.com' });
+    const existingAdmin = await User.findOne({ email: 'admin2@ahadulearning.com' });
     
     if (existingAdmin) {
       console.log('ℹ️ Admin user already exists:');
@@ -40,7 +40,7 @@ async function createSecondAdmin() {
       
       const admin = new User({
         name: 'Secondary Administrator',
-        email: 'admin2@fidelhub.com',
+        email: 'admin2@ahadulearning.com',
         role: 'admin',
         password: hashedPassword,
         isApproved: true,
@@ -51,7 +51,7 @@ async function createSecondAdmin() {
       await admin.save();
       
       console.log('✅ Second admin user created successfully!');
-      console.log('📧 Email: admin2@fidelhub.com');
+      console.log('📧 Email: admin2@ahadulearning.com');
       console.log('🔑 Password: Admin456!@#');
       console.log('🌐 URL: http://localhost:5173/admin-dashboard');
     }

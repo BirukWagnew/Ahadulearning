@@ -8,6 +8,7 @@ import {
   updateMessage,
   deleteMessage,
   getConversations,
+  getChatContacts,
 } from "../controllers/chatController.js";
 import { upload } from "../middleware/uploadfile.js";
 
@@ -15,6 +16,7 @@ const router = express.Router();
 
 router.post("/conversations", createConversation); // Create conversation for students and instructors
 router.get("/conversations", protect, getConversations);
+router.get("/contacts", protect, getChatContacts);
 router.post("/messages", upload.single("file"), sendMessage);  //
 router.get("/messages/:conversationId", getMessages); // Get all messages in a conversation
 router.put("/messages/:messageId", updateMessage); // Update a message

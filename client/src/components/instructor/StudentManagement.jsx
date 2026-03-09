@@ -29,6 +29,8 @@ import { useAuth } from "../../context/AuthContext";
 import StudentDetails from "../instructor-dashboard/StudentDetails";
 import { format } from 'date-fns';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const StudentManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,7 +49,7 @@ const StudentManagement = () => {
 
       try {
         const response = await fetch(
-          `http://localhost:5000/api/courses/${user._id}/courses/progress`,
+          `${API_BASE_URL}/api/courses/${user._id}/courses/progress`,
           {
             method: 'POST',
             headers: {

@@ -84,11 +84,18 @@ const TermsOfService = () => {
               </h3>
               <p className="text-muted-foreground mb-6">
                 All payments are processed through secure payment gateways. 
-                Refunds are subject to our refund policy and course-specific terms.
+                Once a payment has been completed, there are no returns or refunds.
               </p>
 
               <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-4">
-                6. Intellectual Property
+                6. Security and Misuse
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Any attempt to interrupt, abuse, or interfere with the system or platform services may result in permanent account blocking.
+              </p>
+
+              <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-4">
+                7. Intellectual Property
               </h3>
               <p className="text-muted-foreground mb-6">
                 All course content and materials are the intellectual property of Ahadu Online Learning 
@@ -96,7 +103,7 @@ const TermsOfService = () => {
               </p>
 
               <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-4">
-                7. Service Availability
+                8. Service Availability
               </h3>
               <p className="text-muted-foreground mb-6">
                 We strive to maintain high service availability but cannot guarantee 100% uptime. 
@@ -104,7 +111,7 @@ const TermsOfService = () => {
               </p>
 
               <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-4">
-                8. Limitation of Liability
+                9. Limitation of Liability
               </h3>
               <p className="text-muted-foreground mb-6">
                 Ahadu Online Learning shall not be liable for any indirect, incidental, or consequential 
@@ -112,7 +119,7 @@ const TermsOfService = () => {
               </p>
 
               <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-4">
-                9. Contact Information
+                10. Contact Information
               </h3>
               <p className="text-muted-foreground mb-6">
                 For questions about these Terms of Service, please contact us at:

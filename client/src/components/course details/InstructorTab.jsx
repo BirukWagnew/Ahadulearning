@@ -6,19 +6,24 @@ export const InstructorTab = ({ courseId, studentId }) => {
   const [course, setCourse] = useState(null);
   const [error, setError] = useState(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
+        const token = localStorage.getItem('token');
         const res = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) {
+          const msg = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status} ${msg}`);
+        }
         const data = await res.json();
         setCourse(data);
       } catch (err) {
