@@ -14,7 +14,8 @@ const VerifyOTP = () => {
     const location = useLocation();
     const { toast } = useToast();
 
-    const { email, registrationData, timestamp, isPasswordReset } = location.state || {};
+    const { email, registrationData, timestamp, isPasswordReset, devOtp } = location.state || {};
+    const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || '');
 
     useEffect(() => {
         if (!email) {
@@ -169,10 +170,18 @@ const VerifyOTP = () => {
                 throw new Error(data.message || 'Failed to resend code');
             }
             
-            toast({
-                title: "New Code Sent",
-                description: `A new verification code has been sent to ${email}`,
-            });
+            if (data.otp) {
+                setCurrentDevOtp(data.otp);
+                toast({
+                    title: "Code Sent",
+                    description: `Verification code sent! (Code: ${data.otp})`,
+                });
+            } else {
+                toast({
+                    title: "New Code Sent",
+                    description: `A new verification code has been sent to ${email}`,
+                });
+            }
         } catch (error) {
             toast({
                 title: "Resend Failed",
@@ -197,6 +206,24 @@ const VerifyOTP = () => {
                             Sent to <span className="font-medium">{email}</span>
                         </p>
                     </div>
+
+                    {currentDevOtp && (
+                        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                            <p className="text-xs text-blue-700 font-medium mb-1">Development Verification Code:</p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const digits = currentDevOtp.split('').slice(0, 6);
+                                    setOtp(digits);
+                                }}
+                                className="text-2xl font-mono font-bold text-blue-800 tracking-widest hover:underline cursor-pointer"
+                                title="Click to auto-fill"
+                            >
+                                {currentDevOtp}
+                            </button>
+                            <p className="text-[11px] text-blue-500 mt-0.5">(Click to auto-fill)</p>
+                        </div>
+                    )}
                     
                     <form className="space-y-4" onSubmit={handleVerify}>
                         <div className="flex justify-center space-x-2">

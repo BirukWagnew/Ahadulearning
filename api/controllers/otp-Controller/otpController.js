@@ -43,9 +43,13 @@ export const sendOtp = async (req, res) => {
       </div>
     `;
     
-    await sendEmail(email, emailSubject, emailContent);
+    const emailResult = await sendEmail(email, emailSubject, emailContent);
     
-    res.status(200).json({ message: 'OTP sent successfully' });
+    res.status(200).json({ 
+      message: 'OTP sent successfully',
+      otp: otp,
+      emailSent: emailResult?.provider ? true : false
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error generating OTP', error: error.message });
   }
@@ -140,10 +144,14 @@ export const requestPasswordReset = async (req, res) => {
         </div>
       `;
       
-      await sendEmail(email, emailSubject, emailContent);
-      console.log('🔍 Email sent successfully');
+      const emailResult = await sendEmail(email, emailSubject, emailContent);
+      console.log('🔍 Email send result:', emailResult);
   
-      res.status(200).json({ message: 'OTP sent to your email for password reset' });
+      res.status(200).json({ 
+        message: 'OTP sent to your email for password reset',
+        otp: otp,
+        emailSent: emailResult?.provider ? true : false
+      });
     } catch (error) {
       console.error('🔍 Password reset error:', error);
       res.status(500).json({ message: 'Error requesting password reset', error: error.message });

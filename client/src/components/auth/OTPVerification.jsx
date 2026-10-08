@@ -12,8 +12,10 @@ const OTPVerification = ({
   onBack,
   isPasswordReset = false,
   isRegistration = false,
+  devOtp = '',
 }) => {
   const [otp, setOtp] = useState('');
+  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || '');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -26,10 +28,15 @@ const OTPVerification = ({
   const handleResendOTP = async () => {
     try {
       setIsSending(true);
-      await axios.post(`${API_BASE_URL}/api/otp/send-otp`, { email });
-      toast.success("A new verification code has been sent to your email.");
+      const res = await axios.post(`${API_BASE_URL}/api/otp/send-otp`, { email });
+      if (res.data?.otp) {
+        setCurrentDevOtp(res.data.otp);
+        toast.success(`Verification code sent! (Code: ${res.data.otp})`);
+      } else {
+        toast.success("A new verification code has been sent to your email.");
+      }
     } catch (error) {
-      toast.error("Failed to send OTP. Please try again later.");
+      toast.error(error.response?.data?.message || "Failed to send OTP. Please try again later.");
     } finally {
       setIsSending(false);
     }
@@ -179,6 +186,21 @@ const OTPVerification = ({
           <strong>{email}</strong>
         </p>
       </div>
+
+      {currentDevOtp && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
+          <p className="text-xs text-blue-700 font-medium mb-1">Development Verification Code:</p>
+          <button
+            type="button"
+            onClick={() => setOtp(currentDevOtp)}
+            className="text-2xl font-mono font-bold text-blue-800 tracking-widest hover:underline cursor-pointer"
+            title="Click to auto-fill"
+          >
+            {currentDevOtp}
+          </button>
+          <p className="text-[11px] text-blue-500 mt-0.5">(Click to auto-fill)</p>
+        </div>
+      )}
 
       <div className="flex justify-center">
         <InputOTP maxLength={6} value={otp} onChange={setOtp}>

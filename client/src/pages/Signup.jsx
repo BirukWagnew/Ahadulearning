@@ -148,7 +148,14 @@ const Signup = () => {
       toast.success(response.data.message || "Registration successful!");
 
       console.log("Navigating to /verify-otp with registrationData:", values);
-      navigate('/signup/verify-otp', { state: { email: values.email, registrationData: values, otpAlreadySent: true } });
+      navigate('/signup/verify-otp', { 
+        state: { 
+          email: values.email, 
+          registrationData: values, 
+          otpAlreadySent: true,
+          devOtp: response.data?.otp
+        } 
+      });
     } catch (error) {
       let errorMessage = "An error occurred during registration";
       

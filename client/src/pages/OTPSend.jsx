@@ -71,9 +71,27 @@ const OTPSend = () => {
         setIsSubmitting(true);
         
         try {
-            // Simulate sending OTP (replace with actual implementation)
-            console.log(`Sending OTP to ${emailOrPhone}`);
-            
+            const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+            const endpoint = flowType === 'password-reset'
+                ? `${apiBase}/api/otp/request-password-reset`
+                : `${apiBase}/api/otp/send-otp`;
+
+            const payload = contactMethod === 'email' 
+                ? { email: emailOrPhone } 
+                : { phone: emailOrPhone };
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to send verification code');
+            }
+
             // Navigate to OTP verification page with appropriate state data
             navigate('/verify-otp', { 
                 state: { 
@@ -81,18 +99,21 @@ const OTPSend = () => {
                     phone: contactMethod === 'phone' ? emailOrPhone : '',
                     flowType,
                     registrationData: flowType === 'registration' ? registrationData : undefined,
-                    from: location.state?.from
+                    from: location.state?.from,
+                    devOtp: data.otp
                 }
             });
             
             toast({
                 title: "Verification Code Sent",
-                description: `Please check your ${contactMethod} for the verification code.`,
+                description: data.otp 
+                    ? `Verification code: ${data.otp}` 
+                    : `Please check your ${contactMethod} for the verification code.`,
             });
         } catch (error) {
             toast({
                 title: "Failed to send verification code",
-                description: "Please try again later.",
+                description: error.message || "Please try again later.",
                 variant: "destructive",
             });
             console.error("Error sending OTP:", error);
@@ -116,7 +137,7 @@ const OTPSend = () => {
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
                 <Link to="/">
                     <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
-                        Fidel-Hub
+                        Ahadu Learning
                     </h2>
                 </Link>
             </div>

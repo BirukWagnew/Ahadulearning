@@ -30,6 +30,8 @@ import chatRoutes from "./routes/chatRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import { fileURLToPath } from "url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 await connectDB();
@@ -119,7 +121,13 @@ io.on("connection", (socket) => {
     io.emit("onlineUsers", Array.from(onlineUsers));
   });
 });
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    if (req.originalUrl && req.originalUrl.includes('/webhook')) {
+      req.rawBody = buf.toString();
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
@@ -147,7 +155,13 @@ app.post("/upload", upload.single("cv"), (req, res) => {
 
 app.get("/download/:filename", (req, res) => {
   const { filename } = req.params;
-  const filePath = path.join(__dirname, "uploads", filename);
+  
+  const uploadsDir = path.join(__dirname, "uploads");
+  const filePath = path.resolve(uploadsDir, filename);
+
+  if (!filePath.startsWith(uploadsDir)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
 
   res.download(filePath, filename, (err) => {
     if (err) {
@@ -203,6 +217,7 @@ app.get("/", (req, res) => {
     version: "1.0.0"
   });
 });
+
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

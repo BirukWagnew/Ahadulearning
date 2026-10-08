@@ -35,7 +35,8 @@ const ForgotPassword = () => {
         navigate('/verify-otp', { 
           state: { 
             email, 
-            isPasswordReset: true 
+            isPasswordReset: true,
+            devOtp: response.data?.otp
           }
         });
 
@@ -61,7 +62,7 @@ const ForgotPassword = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/">
           <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
-            Fidel-Hub
+            Ahadu Learning
           </h2>
         </Link>
       </div>

@@ -329,7 +329,6 @@ const InstructorDashboard = () => {
     <PaymentComponent 
       user={user}
       onWithdrawSuccess={(newWithdrawal) => {
-        setWithdrawals(prev => [newWithdrawal, ...prev]);
         toast.success(`Withdrawal of ${newWithdrawal.amount} ETB initiated`);
       }}
     />

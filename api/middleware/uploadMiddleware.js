@@ -31,15 +31,16 @@ const pdfFilter = (req, file, cb) => {
   if (!file) {
     return cb(null, true);
   }
-  if (file.mimetype !== 'application/pdf') {
+  const isPdfExt = path.extname(file.originalname).toLowerCase() === '.pdf';
+  if (file.mimetype !== 'application/pdf' || !isPdfExt) {
     return cb(new Error('Only PDF files are allowed.'));
   }
   cb(null, true);
 };
 
 const imageFilter = (req, file, cb) => {
-  const allowedExt = /jpeg|jpg|png|gif|bmp|svg|webp|tiff/; // Add other image extensions here
-  const allowedMime = /image\/(jpeg|png|gif|bmp|svg\+xml|webp|tiff)/; // Add corresponding MIME types here
+  const allowedExt = /^\.(jpeg|jpg|png|gif|bmp|webp|tiff)$/;
+  const allowedMime = /^image\/(jpeg|png|gif|bmp|webp|tiff)$/;
 
   const isValidExt = allowedExt.test(path.extname(file.originalname).toLowerCase());
   const isValidMime = allowedMime.test(file.mimetype);

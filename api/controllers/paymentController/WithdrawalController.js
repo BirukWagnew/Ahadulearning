@@ -6,32 +6,69 @@ import { testModeWithdrawal } from '../../utils/chapaTest.js';
 export const instructorTestWithdraw = async (req, res) => {
   try {
     const { account_name, account_number, bank_code, amount, bank_name } = req.body;
-    const instructor = await User.findById(req.user._id);
+    
+    // 1. Atomically deduct balance
+    const updatedInstructor = await User.findOneAndUpdate(
+      { _id: req.user._id, availableBalance: { $gte: amount } },
+      { $inc: { availableBalance: -amount } },
+      { new: true }
+    );
 
-    if (!instructor) return res.status(404).json({ message: 'Instructor not found' });
-    if (instructor.availableBalance < amount) return res.status(400).json({ message: 'Insufficient balance' });
+    if (!updatedInstructor) {
+      // Could be not found, or insufficient balance
+      const instructorExists = await User.findById(req.user._id);
+      if (!instructorExists) return res.status(404).json({ message: 'Instructor not found' });
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
 
-    const result = await testModeWithdrawal({ account_name, account_number, bank_code, amount });
+    // 2. Initiate payout
+    let result;
+    try {
+      result = await testModeWithdrawal({ account_name, account_number, bank_code, amount });
+    } catch (apiError) {
+      // 3a. Rollback if external API throws an exception
+      await User.updateOne({ _id: req.user._id }, { $inc: { availableBalance: amount } });
+      console.error('Withdrawal API Error:', apiError.message);
+      return res.status(500).json({ error: 'External payment service failed. Balance restored.' });
+    }
 
     const reference = result?.data || `FIDEL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // 3b. Rollback if external API returns a failure status
+    if (result.status !== 'success') {
+      await User.updateOne({ _id: req.user._id }, { $inc: { availableBalance: amount } });
+      
+      const failedWithdrawal = await Withdrawal.create({
+        user: req.user._id,
+        amount,
+        reference,
+        status: 'failed',
+        responseMessage: result.message || 'Payment provider failed',
+        bankName: bank_name,
+        accountNumber: account_number,
+      });
+
+      return res.status(400).json({ 
+        message: 'Withdrawal failed. Balance restored.',
+        transaction: result,
+        withdrawal: failedWithdrawal 
+      });
+    }
 
     const newWithdrawal = await Withdrawal.create({
       user: req.user._id,
       amount,
       reference,
-      status: result.status === 'success' ? 'success' : 'failed',
+      status: 'success',
       responseMessage: result.message,
       bankName: bank_name,
       accountNumber: account_number,
     });
 
-    instructor.availableBalance -= amount;
-    await instructor.save();
-
     return res.status(200).json({
       message: 'Withdrawal successful (test mode)',
       transaction: result,
-      remainingBalance: instructor.availableBalance.toFixed(1),
+      remainingBalance: updatedInstructor.availableBalance.toFixed(1),
       withdrawal: newWithdrawal,
     });
   } catch (error) {

@@ -13,6 +13,8 @@ const OTPVerificationPage = () => {
   const isRegistration = location.state?.flowType === 'registration';
   const registrationData = location.state?.registrationData;
   
+  const devOtp = location.state?.devOtp;
+  
   useEffect(() => {
     if (!email) {
       navigate('/login', { replace: true });
@@ -23,13 +25,13 @@ const OTPVerificationPage = () => {
     if (isPasswordReset) {
       // If password reset was successful, go to login page
       navigate('/login', { 
-        replace: true,
+        replace: true, 
         state: { passwordReset: true }
       });
     } else if (isRegistration && registrationData) {
       // Complete the registration process
       navigate('/login', { 
-        replace: true,
+        replace: true, 
         state: { 
           verifiedData: registrationData,
           verifiedEmail: email
@@ -66,7 +68,7 @@ const OTPVerificationPage = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/">
           <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
-            Fidel-Hub
+            Ahadu Learning
           </h2>
         </Link>
       </div>
@@ -79,6 +81,7 @@ const OTPVerificationPage = () => {
             onBack={handleBack}
             isPasswordReset={isPasswordReset}
             isRegistration={isRegistration}
+            devOtp={devOtp}
           />
         </div>
       </div>

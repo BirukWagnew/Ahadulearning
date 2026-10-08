@@ -7,8 +7,12 @@ import { sendPhoneOTP } from '../services/phoneOTPService.js';
 import { sendSMSOTP } from '../services/smsOTPService.js';
 import { sendTextBeltOTP } from '../services/textBeltService.js';
 
- export const registerUser = async (req, res) => {
+export const registerUser = async (req, res) => {
   const { name, email, phone, role, expertise, password, confirmPassword } = req.body;
+
+  if (role === 'admin') {
+    return res.status(403).json({ message: 'Registering as an admin is forbidden' });
+  }
 
    if (password !== confirmPassword) {
     return res.status(400).json({ message: 'Passwords do not match' });
@@ -44,7 +48,8 @@ import { sendTextBeltOTP } from '../services/textBeltService.js';
     
     // Always send OTP via email (primary method)
     console.log('📧 Sending OTP via email to:', email);
-    
+    console.log('🎯 DEVELOPMENT OTP CODE:', otp);
+
     // Send OTP via email with professional template
     const emailSubject = 'Ahadu Online Learning - Your OTP Verification Code';
     const emailContent = `
@@ -76,11 +81,18 @@ import { sendTextBeltOTP } from '../services/textBeltService.js';
       </div>
     `;
     
-    await sendEmail(email, emailSubject, emailContent);
+    const emailResult = await sendEmail(email, emailSubject, emailContent);
     
     res.status(201).json({ 
       message: 'Registration successful! Please check your email for the OTP verification code.',
       otpSent: true,
+      emailSent: emailResult?.provider ? true : false,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

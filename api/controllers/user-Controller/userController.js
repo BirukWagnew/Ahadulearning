@@ -51,13 +51,13 @@ export const updateUserPassword = async (req, res) => {
     const user = await User.findById(userId).select('+password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // if (!currentPassword || !newPassword || !confirmPassword) {
-    //   return res.status(400).json({ message: 'All fields are required' });
-    // }
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
 
-    // if (newPassword !== confirmPassword) {
-    //   return res.status(400).json({ message: 'New passwords do not match' });
-    // }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'New passwords do not match' });
+    }
 
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {

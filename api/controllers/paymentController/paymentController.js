@@ -8,6 +8,7 @@ import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +49,7 @@ const drawConsolidatedTable = (doc, sections, startX, startY) => {
 };
 
 export const initiatePayment = async (req, res) => {
-  const { amount, email, fullName, courseId } = req.body;
+  const { email, fullName, courseId } = req.body;
   const studentId = req.user?._id; // Grab from authenticated user
   const tx_ref = `AHADU-${Date.now()}`;
 
@@ -61,7 +62,7 @@ export const initiatePayment = async (req, res) => {
   }
 
   // Validate required fields
-  if (!amount || !email || !fullName || !courseId) {
+  if (!email || !fullName || !courseId) {
     return res.status(400).json({
       message: 'Missing required fields.',
       error: 'Missing required fields.',
@@ -88,7 +89,7 @@ export const initiatePayment = async (req, res) => {
   console.log('Chapa callback_url:', `${process.env.FRONTEND_URL}/payment-success?course=${courseId}&tx_ref=${tx_ref}`);
 
   try {
-    const courseForOwnershipCheck = await Course.findById(courseId).select('instructor');
+    const courseForOwnershipCheck = await Course.findById(courseId).select('instructor price');
     if (!courseForOwnershipCheck) {
       return res.status(404).json({ error: 'Course not found.' });
     }
@@ -96,6 +97,8 @@ export const initiatePayment = async (req, res) => {
     if (courseForOwnershipCheck.instructor?.toString() === studentId.toString()) {
       return res.status(400).json({ error: 'Instructors cannot purchase their own course.' });
     }
+
+    const amount = courseForOwnershipCheck.price;
 
     // Step 1: Create a payment record in the database with 'pending' status
     await Payment.create({ studentId, courseId, amount, tx_ref, status: 'pending' });
@@ -150,93 +153,153 @@ export const initiatePayment = async (req, res) => {
 };
 
 export const chapaWebhook = async (req, res) => {
+  // 1. Signature Verification
+  const signature = req.headers['chapa-signature'] || req.headers['x-chapa-signature'];
+  const secret = process.env.CHAPA_WEBHOOK_SECRET || process.env.CHAPA_SECRET_KEY;
+  
+  if (!secret) {
+    console.error('Webhook secret is missing from environment variables');
+    return res.status(500).send('Server configuration error');
+  }
+
+  if (!signature) {
+    return res.status(401).send('Missing signature');
+  }
+
+  if (!req.rawBody) {
+    console.error('Raw body missing, unable to verify webhook');
+    return res.status(500).send('Internal server error');
+  }
+
+  const hash = crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex');
+  
+  // Constant-time comparison
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(signature))) {
+      console.error('Invalid signature');
+      return res.status(401).send('Invalid signature');
+    }
+  } catch (err) {
+    console.error('Signature comparison error or length mismatch:', err);
+    return res.status(401).send('Invalid signature');
+  }
+
   const { event, data } = req.body;
 
-  console.log('Webhook Received:', {
-    headers: req.headers,
-    body: JSON.stringify(req.body, null, 2),
-  });
-
-  if (event === 'charge.completed' && data.status === 'success') {
+  if (event === 'charge.completed' && data && data.status === 'success') {
     const { tx_ref } = data;
 
     try {
-      // Update payment status
-      const payment = await Payment.findOneAndUpdate(
-        { tx_ref },
-        { status: 'success', chapaData: data },
-        { new: true }
-      );
-
+      // 2. Extract tx_ref and find pending Payment
+      const payment = await Payment.findOne({ tx_ref });
       if (!payment) {
         console.error('Payment not found for tx_ref:', tx_ref);
         return res.status(404).send('Payment not found');
       }
 
-      const course = await Course.findById(payment.courseId);
+      // Idempotency: if already success, just return 200
+      if (payment.status === 'success') {
+        return res.status(200).send('Payment already processed');
+      }
+
+      // 3. Verify the transaction with Chapa
+      const chapaResponse = await axios.get(
+        `https://api.chapa.co/v1/transaction/verify/${tx_ref}`,
+        {
+          headers: { Authorization: `Bearer ${process.env.CHAPA_SECRET_KEY}` },
+          timeout: 10000,
+        }
+      );
+
+      const chapaData = chapaResponse.data;
+      if (chapaData.status !== 'success' || chapaData.data.status !== 'success') {
+        console.error('Chapa payment verification failed:', chapaData);
+        return res.status(400).send('Payment verification failed');
+      }
+
+      // Confirm returned tx_ref matches
+      if (chapaData.data.tx_ref !== payment.tx_ref) {
+        console.error('Transaction reference mismatch');
+        return res.status(400).send('Transaction reference mismatch');
+      }
+
+      // Confirm amount exactly matches
+      if (Number(chapaData.data.amount) !== Number(payment.amount)) {
+        console.error('Amount mismatch');
+        return res.status(400).send('Amount mismatch');
+      }
+
+      // Confirm currency is ETB
+      if (chapaData.data.currency !== 'ETB') {
+        console.error('Currency mismatch');
+        return res.status(400).send('Currency mismatch');
+      }
+
+      // 4. Make processing idempotent using atomic update from pending to success
+      const updatedPayment = await Payment.findOneAndUpdate(
+        { tx_ref, status: 'pending' },
+        { status: 'success', chapaData: chapaData },
+        { new: true }
+      );
+
+      if (!updatedPayment) {
+        // Another webhook request might have updated it concurrently
+        return res.status(200).send('Payment already processed concurrently');
+      }
+
+      // 5. Existing enrollment, transaction, and balance logic
+      const course = await Course.findById(updatedPayment.courseId);
       if (!course) {
-        console.error('Course not found for courseId:', payment.courseId);
+        console.error('Course not found for courseId:', updatedPayment.courseId);
         return res.status(404).send('Course not found');
       }
 
       const instructorId = course.instructor;
       if (!instructorId) {
-        console.error('Instructor not found for course:', payment.courseId);
+        console.error('Instructor not found for course:', updatedPayment.courseId);
         return res.status(404).send('Instructor not found for the course');
       }
 
-      const instructorShare = payment.amount * 0.8;
-      const platformShare = payment.amount * 0.2;
-      const existingTx = await Transaction.findOne({ paymentId: payment._id });
-
+      const instructorShare = updatedPayment.amount * 0.8;
+      const platformShare = updatedPayment.amount * 0.2;
+      
+      const existingTx = await Transaction.findOne({ paymentId: updatedPayment._id });
       if (!existingTx) {
         await Transaction.create({
-          studentId: payment.studentId,
-          courseId: payment.courseId,
+          studentId: updatedPayment.studentId,
+          courseId: updatedPayment.courseId,
           instructorId,
-          paymentId: payment._id,
-          amountPaid: payment.amount,
+          paymentId: updatedPayment._id,
+          amountPaid: updatedPayment.amount,
           instructorShare,
           platformShare,
           status: 'completed',
         });
-        
 
-        // Update instructor balance
         await User.findByIdAndUpdate(
           instructorId,
           { $inc: { availableBalance: instructorShare } }
         );
         console.log('Instructor balance updated for instructorId:', instructorId);
-      } else {
-        console.log('Transaction already exists for paymentId:', payment._id);
       }
 
-      // Create enrollment
       const alreadyEnrolled = await Enrollment.findOne({
-        studentId: payment.studentId,
-        courseId: payment.courseId,
+        studentId: updatedPayment.studentId,
+        courseId: updatedPayment.courseId,
       });
 
       if (!alreadyEnrolled) {
         await Enrollment.create({
-          studentId: payment.studentId,
-          courseId: payment.courseId,
-          paymentId: payment._id,
+          studentId: updatedPayment.studentId,
+          courseId: updatedPayment.courseId,
+          paymentId: updatedPayment._id,
         });
-        console.log('Enrollment created for studentId:', payment.studentId);
-      } else {
-        console.log('Student already enrolled for courseId:', payment.courseId);
+        console.log('Enrollment created for studentId:', updatedPayment.studentId);
       }
 
       return res.status(200).send('Payment, transaction, and enrollment successful');
     } catch (error) {
       console.error('Webhook Processing Error:', error.message, error.stack);
-      if (error.response) {
-        console.error('Chapa API Error:', error.response.data);
-      } else if (error.request) {
-        console.error('No response from Chapa API:', error.request);
-      }
       return res.status(500).send('Server error');
     }
   }
@@ -247,7 +310,6 @@ export const chapaWebhook = async (req, res) => {
 
 export const verifyPayment = async (req, res) => {
   const { tx_ref } = req.params;
-  const { course_id } = req.query;
 
   if (req.user?.role && req.user.role !== 'student') {
     return res.status(403).json({ error: 'Only students can verify course payments.' });
@@ -255,17 +317,11 @@ export const verifyPayment = async (req, res) => {
 
   // Log incoming data for debugging
   console.log('Verify Payment - Incoming tx_ref:', tx_ref);
-  console.log('Verify Payment - Incoming course_id:', course_id);
 
   // Validate required data
   if (!tx_ref) {
     console.error('Verify Payment - Missing tx_ref');
     return res.status(400).json({ error: 'Transaction reference (tx_ref) is required' });
-  }
-
-  if (!course_id) {
-    console.error('Verify Payment - Missing course_id');
-    return res.status(400).json({ error: 'Course ID is required' });
   }
 
   try {
@@ -301,12 +357,13 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({ error: 'Payment record not found in database' });
     }
 
+    const course_id = existingPayment.courseId;
+
     // Update payment status
     const updatedPayment = await Payment.findOneAndUpdate(
       { tx_ref: tx_ref.trim() },
       {
         status: 'success',
-        courseId: course_id,
         verifiedAt: new Date(),
         chapaData: chapaData,
       },

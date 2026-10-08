@@ -376,8 +376,9 @@ const Menu = () => {
                       </div>
                     </div>
                   </div>
-                </Link>
-              </motion.div>
+                </div>
+              </Link>
+            </motion.div>
           ))}
         </motion.div>
 

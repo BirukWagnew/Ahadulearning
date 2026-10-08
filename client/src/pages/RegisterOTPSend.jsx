@@ -42,7 +42,7 @@ const RegisterOTPSend = () => {
         setIsSubmitting(true);
     
         try {
-            const response = await fetch('http://localhost:5000/api/otp/send-otp', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/otp/send-otp`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -67,6 +67,7 @@ const RegisterOTPSend = () => {
                             email,
                         },
                         timestamp: new Date().getTime(),
+                        devOtp: data.otp,
                     },
                 });
                 console.log("Navigating to /signup/verify-otp");  // Debug log to confirm
@@ -87,7 +88,7 @@ const RegisterOTPSend = () => {
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="mb-8 text-center">
                     <Link to="/">
-                        <h1 className="text-3xl font-bold text-gray-900">Fidel-Hub</h1>
+                        <h1 className="text-3xl font-bold text-gray-900">Ahadu Learning</h1>
                     </Link>
                 </div>
                 
